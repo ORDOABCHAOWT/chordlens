@@ -1,0 +1,680 @@
+{
+  "documentType": "codex-security.findings",
+  "findings": [
+    {
+      "attackPath": {
+        "attacker": "Local user, UI automation, or an accidental double activation",
+        "dataflow": {
+          "summary": "Rapid Record activation -> two pending getUserMedia calls -> both resolve -> later call overwrites refs -> Stop/unmount stops only latest stream."
+        },
+        "impact": "Continued ambient microphone capture and an orphaned recorder beyond the visible UI lifecycle.",
+        "likelihood": "medium",
+        "reachability": {
+          "summary": "Reachable through the visible Record button before permission resolution; no external compromise is required."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "if (recording) {\n  recorderRef.current?.stop();\n  setRecording(false);\n  return;\n}\ntry {\n  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });\n  streamRef.current = stream;\n  const recorder = new MediaRecorder(stream);\n  recorderRef.current = recorder;",
+          "endLine": 235,
+          "explanation": "Two activations can both pass the recording check while getUserMedia is pending, then overwrite the same refs.",
+          "id": "mic-pending-gap",
+          "label": "Recording state changes only after permission resolves",
+          "language": "TypeScript",
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "root_control",
+          "startLine": 225
+        },
+        {
+          "code": "streamRef.current?.getTracks().forEach((track) => track.stop());\nstreamRef.current = null;",
+          "endLine": 70,
+          "explanation": "An earlier acquired stream becomes unreachable after a later request replaces streamRef.",
+          "id": "mic-ref-cleanup",
+          "label": "Cleanup reaches only the last stored stream",
+          "language": "TypeScript",
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "sink",
+          "startLine": 68
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "The asynchronous gap, delayed recording-state update, singular shared refs, and ref-based cleanup are directly visible in the current source."
+      },
+      "findingId": "csf_0a8926c0de1858e211f0484b",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:54aec32ef8f370b72c60ad9e1decef187e5c7c6a6221447fd3d962f7fdeb8c12"
+      },
+      "identity": {
+        "anchor": "record-pending-permission-ownership"
+      },
+      "locations": [
+        {
+          "endLine": 258,
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "root_control",
+          "startLine": 225
+        },
+        {
+          "endLine": 85,
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "cleanup",
+          "startLine": 68
+        }
+      ],
+      "occurrenceId": "occ_83046d968d166c84135b9371",
+      "preventiveControls": [
+        "OS microphone permission and indicator",
+        "Fifteen-minute timer for the normal single-recorder flow"
+      ],
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Set a synchronous acquisition-pending guard before awaiting getUserMedia and disable Record while pending. Give each invocation local ownership; stop all tracks immediately if it loses ownership or unmounts, and make callbacks close their captured stream and recorder.",
+      "remediationTests": [
+        "Resolve two deferred getUserMedia promises in both orders and assert every acquired track is stopped.",
+        "Unmount while permission is pending and assert a later-resolving stream is immediately stopped."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "mic-pending-gap",
+          "mic-ref-cleanup"
+        ],
+        "summary": "A pending microphone acquisition has no synchronous ownership guard, and resource handlers use shared mutable refs rather than invocation-owned stream and recorder objects."
+      },
+      "ruleId": "concurrency-race.microphone-acquisition",
+      "severity": {
+        "level": "medium",
+        "rationale": "The path requires local interaction and microphone permission, but a rapid double activation is easy and the resulting privacy impact can persist ambient capture despite an apparent stop.",
+        "score": 5.4,
+        "scoringSystem": "Codex Security qualitative"
+      },
+      "summary": "Record remains startable while getUserMedia is pending, so overlapping acquisitions overwrite shared refs and can leave an earlier microphone stream recording beyond Stop, timeout, or workspace cleanup.",
+      "taxonomy": {
+        "category": "concurrency-race",
+        "cwe": [
+          "CWE-362"
+        ]
+      },
+      "title": "Concurrent microphone-start requests can orphan a live capture stream",
+      "validation": {
+        "counterevidence": "OS permission and the recording indicator remain required, and the normal single-start flow cleans up correctly.",
+        "disposition": "validated",
+        "summary": "Validated by tracing two calls that enter before setRecording(true); both acquire streams, but only the latest remains reachable through streamRef/recorderRef. Ordinary single-acquisition stop, error, timeout, and unmount cleanup are effective countercontrols."
+      }
+    },
+    {
+      "attackPath": {
+        "attacker": "Supplier of a slow audio file plus ordinary local user navigation",
+        "dataflow": {
+          "summary": "Slow Import A -> switch workspace (unmount) -> return and Import B -> A finishes later -> unconditional setTranscription/updateActiveSong modifies B and persists it."
+        },
+        "impact": "Wrong chords/waveform/metadata can be shown and saved under the newer song; concurrent decoders or Python workers consume extra resources.",
+        "likelihood": "medium",
+        "reachability": {
+          "summary": "Reachable with normal workspace buttons and file imports; a deliberately slow input makes ordering reliable."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "if (analysisInFlightRef.current) {\n  URL.revokeObjectURL(picked.url);\n  setAnalysisStatus(\"An audio analysis is already running.\");\n  return;\n}\nanalysisInFlightRef.current = true;\n...\nconst result = useBasicPitch\n  ? await basicPitch.transcribePath(picked.path)\n  : await engine.transcribeAudio(picked.file);\nsetTranscription(result.chords, result.waveform, result.duration);\nconst completedSong = updateActiveSong({ duration: result.duration, bpm: result.bpm, key: result.key });",
+          "endLine": 204,
+          "explanation": "Unmount discards the guard, while the old async continuation still commits into shared state.",
+          "id": "analysis-local-guard",
+          "label": "Instance-local analysis guard and unconditional commit",
+          "language": "TypeScript",
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "root_control",
+          "startLine": 179
+        },
+        {
+          "code": "updateActiveSong: (updates) => {\n  let updated = demoSongs[0];\n  set((state) => {\n    updated = { ...state.activeSong, ...updates };\n    return { activeSong: updated, songs: state.songs.map((song) => song.id === updated.id ? updated : song) };\n  });\n  return updated;\n},",
+          "endLine": 61,
+          "explanation": "No originating song ID or job generation is checked before persistence.",
+          "id": "analysis-current-song-sink",
+          "label": "Completion updates whichever song is active",
+          "language": "TypeScript",
+          "path": "src/app/store.ts",
+          "role": "sink",
+          "startLine": 55
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Component unmount, instance-local refs, uncancelled awaits, unconditional shared-state commits, and update-by-current-active-song are all directly established."
+      },
+      "findingId": "csf_4f50014b75d91c70304f95e5",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:4853825ad8fc62ff4fa9f7198845edbe0b5cc4544a1b858da586efd6031d89f2"
+      },
+      "identity": {
+        "anchor": "component-scoped-analysis-job"
+      },
+      "locations": [
+        {
+          "endLine": 213,
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "root_control",
+          "startLine": 179
+        },
+        {
+          "endLine": 61,
+          "path": "src/app/UnifiedApp.tsx",
+          "role": "entry_point",
+          "startLine": 58
+        },
+        {
+          "endLine": 61,
+          "path": "src/app/store.ts",
+          "role": "sink",
+          "startLine": 55
+        },
+        {
+          "endLine": 220,
+          "path": "src-tauri/src/lib.rs",
+          "role": "affected_operation",
+          "startLine": 205
+        }
+      ],
+      "occurrenceId": "occ_4d9bffe9e9ab911d062831bc",
+      "preventiveControls": [
+        "Per-mounted-window in-flight guard",
+        "Disabled Import and Record controls during the mounted job",
+        "Per-process timeout and output caps"
+      ],
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Move analysis ownership to a service/store that survives navigation. Give jobs immutable IDs and originating song IDs, add cancellation and stale-result checks, update songs by explicit ID, and enforce native process-wide concurrency.",
+      "remediationTests": [
+        "Import A, navigate away and back, import B, complete A last, and verify A cannot update B.",
+        "Verify only one browser/native analyzer remains active across workspace remounts."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "analysis-local-guard",
+          "analysis-current-song-sink"
+        ],
+        "summary": "Analysis ownership, cancellation, and result identity are scoped to a transient React component instead of an application-level job tied to an immutable song ID."
+      },
+      "ruleId": "concurrency-race.analysis-job-lifecycle",
+      "severity": {
+        "level": "medium",
+        "rationale": "The race requires user navigation and a second import, but slow analysis makes it practical; it can corrupt the active song's transcription and persisted metadata while multiplying CPU and memory use.",
+        "score": 5,
+        "scoringSystem": "Codex Security qualitative"
+      },
+      "summary": "The analysis single-flight flag belongs to a TranscribeWindow instance; switching workspaces discards it without cancelling the job, allowing a new job whose results can be overwritten by the older completion.",
+      "taxonomy": {
+        "category": "concurrency-race",
+        "cwe": [
+          "CWE-362"
+        ]
+      },
+      "title": "Workspace remount permits overlapping analysis and stale-result corruption",
+      "validation": {
+        "counterevidence": "The same mounted TranscribeWindow rejects a second analysis, and each Python child has a 180-second timeout.",
+        "disposition": "validated",
+        "summary": "Validated by tracing Import A through an unmount/remount and Import B. The new component starts unlocked; A and B can both finish and mutate the same global state. Existing button disabling only protects a single mounted instance."
+      }
+    },
+    {
+      "attackPath": {
+        "attacker": "Supplier of a large, compressed, high-channel-count, or note-dense audio file",
+        "dataflow": {
+          "summary": "User selects permitted compressed media -> renderer copies file -> browser fully decodes or Python predicts and decodes -> large memory/CPU is consumed before post-allocation controls can reject."
+        },
+        "impact": "Renderer freeze/termination, analyzer failure, and host memory pressure.",
+        "likelihood": "low",
+        "reachability": {
+          "summary": "Requires explicit local import of crafted or resource-intensive media; no network ingestion exists."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "async transcribeAudio(file: File): Promise<TranscriptionResult> {\n  const AudioContextClass = window.AudioContext ?? window.webkitAudioContext;\n  const context = new AudioContextClass();\n  try {\n    const buffer = await context.decodeAudioData(await file.arrayBuffer());\n    assertAudioDuration(buffer.duration);\n    const samples = buffer.getChannelData(0);",
+          "endLine": 62,
+          "explanation": "Peak decoded allocation has already occurred when duration is checked, and there is no channel/sample/decoded-byte budget.",
+          "id": "browser-full-decode",
+          "label": "Full browser decode precedes decoded-duration enforcement",
+          "language": "TypeScript",
+          "path": "src/services/audio/browserAnalysisEngine.ts",
+          "role": "sink",
+          "startLine": 56
+        },
+        {
+          "code": "probed_duration = float(librosa.get_duration(path=str(audio_path)))\n...\n_, _, raw_events = predict(str(audio_path))\nif len(raw_events) > MAX_NOTE_EVENTS:\n    ...\nsamples, sample_rate = librosa.load(str(audio_path), sr=22050, mono=True)",
+          "endLine": 64,
+          "explanation": "The event cap applies after predict returns its complete collection, and the entire audio is decoded again.",
+          "id": "python-full-materialization",
+          "label": "Basic Pitch and librosa materialize full results",
+          "language": "Python",
+          "path": "engine/basic-pitch/transcribe.py",
+          "role": "sink",
+          "startLine": 54
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Whole-file renderer reads, decodeAudioData before the authoritative duration assertion, full-file Basic Pitch prediction/librosa load, and the absence of decoded-byte or child-memory limits are explicit."
+      },
+      "findingId": "csf_0c27b527cee694806b203752",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:ee6ade6a1742dc764c9d5237170ef21882fa071509373834a53c29033b318b1a"
+      },
+      "identity": {
+        "anchor": "full-audio-decode-before-effective-budget"
+      },
+      "locations": [
+        {
+          "endLine": 3,
+          "path": "src/services/audio/audioPolicy.ts",
+          "role": "root_control",
+          "startLine": 1
+        },
+        {
+          "endLine": 46,
+          "path": "src/services/audio/filePicker.ts",
+          "role": "source",
+          "startLine": 40
+        },
+        {
+          "endLine": 68,
+          "path": "src/services/audio/browserAnalysisEngine.ts",
+          "role": "sink",
+          "startLine": 56
+        },
+        {
+          "endLine": 64,
+          "path": "engine/basic-pitch/transcribe.py",
+          "role": "sink",
+          "startLine": 54
+        },
+        {
+          "endLine": 223,
+          "path": "src-tauri/src/lib.rs",
+          "role": "control",
+          "startLine": 205
+        }
+      ],
+      "occurrenceId": "occ_6e1fdbcea1ffcdee104e7db4",
+      "preventiveControls": [
+        "100 MB compressed-byte cap",
+        "One-hour nominal-duration cap",
+        "Header signature validation",
+        "Single mounted-window UI guard",
+        "Python timeout and bounded stdout/stderr"
+      ],
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Use conservative pre-decode limits on duration, channels, sample rate, estimated PCM bytes, and browser-analysis work. Prefer chunked/worker analysis, apply the metadata check to WebM, support cancellation, and run Basic Pitch with enforceable memory and cumulative event/sample budgets.",
+      "remediationTests": [
+        "Reject metadata whose estimated decoded PCM exceeds the configured budget before decode.",
+        "Verify WebM receives the same pre-decode duration check.",
+        "Exercise a dense synthetic file and confirm child memory/work limits stop it."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "browser-full-decode",
+          "python-full-materialization"
+        ],
+        "summary": "Policy limits compressed bytes and duration but lacks pre-decode decoded-memory/work budgets, chunking, cancellation, and an OS-enforced child memory ceiling."
+      },
+      "ruleId": "resource-exhaustion.decoded-audio-budget",
+      "severity": {
+        "level": "low",
+        "rationale": "A selected file can produce gigabyte-scale decoded allocations and sustained work, but the attack is user-assisted, local, time-bounded on the sidecar path, and affects availability rather than confidentiality or code execution.",
+        "score": 3.7,
+        "scoringSystem": "Codex Security qualitative"
+      },
+      "summary": "The 100 MB and one-hour policy bounds compressed input and nominal duration but not decoded samples, channels, peak memory, or model work; browser and Python paths fully materialize accepted media.",
+      "taxonomy": {
+        "category": "resource-exhaustion",
+        "cwe": [
+          "CWE-400"
+        ]
+      },
+      "title": "Accepted audio can exhaust memory and CPU before effective decoded-resource limits apply",
+      "validation": {
+        "counterevidence": "Inputs are limited to 100 MB and one hour, common signatures are checked, browser contexts close, work periodically yields, Python output is capped, note count is capped after prediction, and children time out.",
+        "disposition": "validated",
+        "summary": "Validated for accepted files: one hour of multichannel 48 kHz float PCM can exceed a gigabyte before decoder overhead, and the Python path materializes model results plus a full mono decode. Existing limits reduce but do not eliminate the peak."
+      }
+    },
+    {
+      "attackPath": {
+        "attacker": "JavaScript executing after a separate renderer compromise",
+        "dataflow": {
+          "summary": "Compromised main renderer -> invoke run_basic_pitch with chosen path -> native metadata/extension checks -> Python opens canonical path -> derived analysis returns to renderer."
+        },
+        "impact": "Bypass of picker consent, local path probing, and derived disclosure for supported user-readable audio files.",
+        "likelihood": "low",
+        "reachability": {
+          "summary": "The command is registered for the local main window; no independent repository-backed path to renderer code execution was found."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "async transcribePath(path: string): Promise<TranscriptionResult> {\n  const json = await invoke<string>(\"run_basic_pitch\", { audioPath: path });\n  return JSON.parse(json) as TranscriptionResult;\n}",
+          "endLine": 15,
+          "explanation": "The path itself acts as both locator and authorization.",
+          "id": "renderer-path-ipc",
+          "label": "Renderer forwards an unrestricted string",
+          "language": "TypeScript",
+          "path": "src/services/audio/basicPitchEngine.ts",
+          "role": "source",
+          "startLine": 13
+        },
+        {
+          "code": "fn validate_audio_path(audio_path: &str) -> Result<PathBuf, String> {\n    let path = PathBuf::from(audio_path);\n    let metadata = fs::metadata(&path).map_err(|_| \"The selected audio file is unavailable.\".to_string())?;\n    ...\n    fs::canonicalize(path).map_err(|_| \"The selected audio file could not be resolved.\".to_string())\n}",
+          "endLine": 180,
+          "explanation": "Safety checks do not establish that the user selected this canonical path.",
+          "id": "native-path-validation",
+          "label": "Native validation has no picker authorization",
+          "language": "Rust",
+          "path": "src-tauri/src/lib.rs",
+          "role": "root_control",
+          "startLine": 167
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "The normal picker flow and independent path-taking IPC command are directly connected; no picker token, native allowlist, or authorized-directory check exists."
+      },
+      "findingId": "csf_2e2e912b93e7dbefff5f396a",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:42825c5efe658762ef1165abf079241999ff0cd6bef8fe2e5824bf4eaf2f008d"
+      },
+      "identity": {
+        "anchor": "run-basic-pitch-renderer-path"
+      },
+      "locations": [
+        {
+          "endLine": 15,
+          "path": "src/services/audio/basicPitchEngine.ts",
+          "role": "source",
+          "startLine": 13
+        },
+        {
+          "endLine": 180,
+          "path": "src-tauri/src/lib.rs",
+          "role": "root_control",
+          "startLine": 167
+        },
+        {
+          "endLine": 210,
+          "path": "src-tauri/src/lib.rs",
+          "role": "sink",
+          "startLine": 205
+        }
+      ],
+      "occurrenceId": "occ_4b6c86ae4b0dda929f82afc1",
+      "preventiveControls": [
+        "Restrictive CSP and no remote capability origins",
+        "Regular-file, byte-size, extension, and canonicalization checks",
+        "Shell-free process arguments"
+      ],
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Move selection into the native command or issue a short-lived, window-bound opaque token for a canonical path selected by the dialog. Require that token for analysis instead of accepting arbitrary paths.",
+      "remediationTests": [
+        "Invoke run_basic_pitch with a non-authorized supported path and require rejection.",
+        "Verify a picker-issued token is single-window, short-lived, and bound to the canonical file."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "renderer-path-ipc",
+          "native-path-validation"
+        ],
+        "summary": "The custom IPC treats an attacker-controlled path string as sufficient authority, bypassing the dialog-scoped capability model."
+      },
+      "ruleId": "path-authorization.native-audio-analysis",
+      "severity": {
+        "level": "low",
+        "rationale": "A compromised renderer can bypass the picker boundary and analyze user-readable files, but no renderer injection path was found and the command returns derived analysis rather than raw bytes.",
+        "score": 3.2,
+        "scoringSystem": "Codex Security qualitative"
+      },
+      "summary": "The native run_basic_pitch command validates path shape, size, extension, and canonicalization but does not prove the path was authorized through the file picker.",
+      "taxonomy": {
+        "category": "path-authorization",
+        "cwe": [
+          "CWE-73"
+        ]
+      },
+      "title": "Basic Pitch IPC accepts arbitrary renderer-supplied local paths",
+      "validation": {
+        "counterevidence": "No XSS, remote navigation, remote capability origin, shell injection, or raw-byte return path was found. Exploitation requires a separate renderer compromise.",
+        "disposition": "validated",
+        "summary": "Validated for JavaScript already executing in the local main renderer. It can invoke the command with any user-readable allowed-extension file; the native side does not maintain selection provenance."
+      }
+    },
+    {
+      "attackPath": {
+        "attacker": "JavaScript executing after a separate renderer compromise",
+        "dataflow": {
+          "summary": "Compromised renderer loops IPC calls -> each native handler dispatches blocking work -> each call spawns python3 -> aggregate processes consume system resources."
+        },
+        "impact": "Application or desktop denial of service through aggregate CPU, memory, and process exhaustion.",
+        "likelihood": "low",
+        "reachability": {
+          "summary": "Registered local-window commands are directly callable by renderer JavaScript; no source-backed renderer compromise was found."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "fn run_basic_pitch_blocking(app: AppHandle, audio_path: String) -> Result<String, String> {\n    let script = transcription_script(&app).ok_or_else(|| \"Basic Pitch adapter was not found\".to_string())?;\n    let audio_path = validate_audio_path(&audio_path)?;\n    let mut child = Command::new(\"python3\")\n        .arg(script)\n        .arg(audio_path)\n        .stdout(Stdio::piped())\n        .stderr(Stdio::piped())\n        .spawn()",
+          "endLine": 214,
+          "explanation": "No native shared concurrency gate precedes process creation.",
+          "id": "native-spawn-per-call",
+          "label": "Every analysis request starts a child",
+          "language": "Rust",
+          "path": "src-tauri/src/lib.rs",
+          "role": "root_control",
+          "startLine": 205
+        },
+        {
+          "code": "tauri::Builder::default()\n    .plugin(tauri_plugin_dialog::init())\n    .plugin(tauri_plugin_fs::init())\n    ...\n    .invoke_handler(tauri::generate_handler![basic_pitch_available, run_basic_pitch, save_song, list_songs])",
+          "endLine": 256,
+          "explanation": "Renderer code can call native commands directly without passing through the React in-flight guard.",
+          "id": "native-registered-commands",
+          "label": "Both process-spawning commands are registered",
+          "language": "Rust",
+          "path": "src-tauri/src/lib.rs",
+          "role": "entry_point",
+          "startLine": 247
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "Both registered commands independently spawn python3 and no shared state, semaphore, queue, deduplication, or cancellation registry exists."
+      },
+      "findingId": "csf_5181cb18fce54ddd1b9a8d74",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:1d2baff8d58c01bcd90eb3efe45c0c36b937d717edaf0133596be87076625a5c"
+      },
+      "identity": {
+        "anchor": "unbounded-python-command-invocations"
+      },
+      "locations": [
+        {
+          "endLine": 155,
+          "path": "src-tauri/src/lib.rs",
+          "role": "affected_operation",
+          "startLine": 137
+        },
+        {
+          "endLine": 220,
+          "path": "src-tauri/src/lib.rs",
+          "role": "root_control",
+          "startLine": 205
+        },
+        {
+          "endLine": 256,
+          "path": "src-tauri/src/lib.rs",
+          "role": "entry_point",
+          "startLine": 240
+        }
+      ],
+      "occurrenceId": "occ_2233360cb33cdbfaedeb5dfe",
+      "preventiveControls": [
+        "Per-child timeout",
+        "Capped stdout/stderr",
+        "Normal UI single-flight guard"
+      ],
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Add native shared state with a semaphore or single-job queue for availability and analysis, coalesce availability probes, reject duplicate per-window jobs, and support cancellation.",
+      "remediationTests": [
+        "Fire concurrent IPC requests and assert the configured process cap is never exceeded.",
+        "Verify repeated availability probes are coalesced or cached."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "native-spawn-per-call",
+          "native-registered-commands"
+        ],
+        "summary": "Expensive process creation is guarded only by renderer component state and not by native process-wide admission control."
+      },
+      "ruleId": "resource-exhaustion.native-process-concurrency",
+      "severity": {
+        "level": "low",
+        "rationale": "Many concurrent calls can exhaust CPU, memory, and process resources, but direct abuse requires renderer code execution and every child has a deadline.",
+        "score": 3.5,
+        "scoringSystem": "Codex Security qualitative"
+      },
+      "summary": "basic_pitch_available and run_basic_pitch can each spawn a Python process per IPC call; UI-only serialization does not protect the native trust boundary.",
+      "taxonomy": {
+        "category": "resource-exhaustion",
+        "cwe": [
+          "CWE-770"
+        ]
+      },
+      "title": "Native analysis commands lack a global subprocess concurrency limit",
+      "validation": {
+        "counterevidence": "Normal UI behavior calls availability once per import and blocks a second import in the same mounted component; children have 10- and 180-second timeouts.",
+        "disposition": "validated",
+        "summary": "Validated for compromised renderer code, which can directly invoke both commands repeatedly. Per-child timeouts and output caps bound individual processes but not aggregate concurrency."
+      }
+    },
+    {
+      "attackPath": {
+        "attacker": "Recipient of an analysis JSON shared by the user",
+        "dataflow": {
+          "summary": "Native picker absolute path -> Song.filePath -> activeSong -> JSON.stringify export -> user shares JSON -> recipient reads local path."
+        },
+        "impact": "Disclosure of username, directory layout, and sensitive names embedded in local paths.",
+        "likelihood": "medium",
+        "reachability": {
+          "summary": "Reachable through the visible Export controls after a native import and an ordinary file-sharing action."
+        }
+      },
+      "codeEvidence": [
+        {
+          "code": "const exportAnalysis = () => {\n  const blob = new Blob([JSON.stringify({ song: activeSong, chords }, null, 2)], { type: \"application/json\" });\n  const link = document.createElement(\"a\");\n  link.href = URL.createObjectURL(blob);\n  link.download = `${activeSong.title}-chords.json`;\n  link.click();\n  URL.revokeObjectURL(link.href);\n};",
+          "endLine": 272,
+          "explanation": "activeSong includes filePath, and no public export projection removes it.",
+          "id": "export-full-song",
+          "label": "Portable export serializes internal Song fields",
+          "language": "TypeScript",
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "root_control",
+          "startLine": 266
+        },
+        {
+          "code": "const song = { id: `${Date.now()}`, title, artist: \"Imported Audio\", duration: metadataDuration, filePath: picked.path, createdAt: new Date().toISOString() };\nimportSong(song, picked.url);",
+          "endLine": 194,
+          "explanation": "In Tauri, picked.path is the absolute path returned by the native dialog.",
+          "id": "song-file-path",
+          "label": "Imported absolute path enters Song",
+          "language": "TypeScript",
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "source",
+          "startLine": 193
+        }
+      ],
+      "confidence": {
+        "level": "high",
+        "rationale": "The picker returns an absolute native path, importSong stores it as filePath, and exportAnalysis serializes activeSong without projection."
+      },
+      "findingId": "csf_97fe82bdcfc2130b243c9a5d",
+      "fingerprints": {
+        "algorithm": "codex-security/v1",
+        "primary": "codex-security/v1:sha256:d06b9afef4211687f9e53fd3f20f1bf468046bb8001692ed1f75b0b7484ecbb5"
+      },
+      "identity": {
+        "anchor": "analysis-export-full-song-object"
+      },
+      "locations": [
+        {
+          "endLine": 46,
+          "path": "src/services/audio/filePicker.ts",
+          "role": "source",
+          "startLine": 34
+        },
+        {
+          "endLine": 194,
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "propagation",
+          "startLine": 193
+        },
+        {
+          "endLine": 272,
+          "path": "src/features/transcribe/TranscribeWindow.tsx",
+          "role": "root_control",
+          "startLine": 266
+        }
+      ],
+      "occurrenceId": "occ_9da05a4abdd40bcf8b03de39",
+      "preventiveControls": [
+        "User-initiated export only",
+        "No automatic upload or network client"
+      ],
+      "provenance": {
+        "source": "local_plugin"
+      },
+      "remediation": "Export a dedicated public Song shape that omits filePath and internal-only fields. If path inclusion is needed, make it explicit opt-in with a clear privacy warning.",
+      "remediationTests": [
+        "Export a native-imported song and assert the JSON contains no filePath or absolute local path.",
+        "Verify any path-including export requires explicit confirmation."
+      ],
+      "rootCause": {
+        "evidenceRefs": [
+          "export-full-song",
+          "song-file-path"
+        ],
+        "summary": "The export boundary reuses an internal persistence model instead of a dedicated public data-transfer shape."
+      },
+      "ruleId": "information-disclosure.export-local-path",
+      "severity": {
+        "level": "low",
+        "rationale": "Disclosure requires an explicit user export and subsequent sharing, but absolute paths can contain usernames and sensitive project/client names that recipients do not need.",
+        "score": 2.6,
+        "scoringSystem": "Codex Security qualitative"
+      },
+      "summary": "Export serializes the complete Song object, including the native picker path, so a shared analysis JSON can reveal the account name and directory layout.",
+      "taxonomy": {
+        "category": "information-disclosure",
+        "cwe": [
+          "CWE-200"
+        ]
+      },
+      "title": "Analysis export includes the user's absolute local audio path",
+      "validation": {
+        "counterevidence": "The user must explicitly export and then share the file; no network transmission occurs automatically.",
+        "disposition": "validated",
+        "summary": "Validated for native imports: the absolute dialog path is stored and included verbatim in exported JSON. Browser imports store only the filename, and there is no automatic upload."
+      }
+    }
+  ],
+  "scanId": "8b7e3447-c5fc-4d7e-91ba-b109dd276425",
+  "schemaVersion": "1.0"
+}

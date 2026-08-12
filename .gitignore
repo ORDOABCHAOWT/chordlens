@@ -1,0 +1,13 @@
+node_modules
+dist
+.DS_Store
+src-tauri/target
+visual-tests/current.png
+visual-tests/diff.png
+visual-tests/report.json
+visual-tests/unified-current.png
+test-results
+playwright-report
+release/*.app/
+*.log
+*.tsbuildinfo

@@ -1,0 +1,24 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", sans-serif;
+  color: #17171a;
+  background: transparent;
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --bg-app: #f6f7f8;
+  --bg-surface: #ffffff;
+  --bg-subtle: #f7f7f8;
+  --text-primary: #17171a;
+  --text-secondary: #66666c;
+  --text-tertiary: #9a9aa1;
+  --border: rgba(20, 20, 25, 0.09);
+  --border-soft: rgba(20, 20, 25, 0.06);
+  --accent: #6553e6;
+  --accent-deep: #5742dc;
+  --accent-soft: #efecff;
+  --accent-border: #8478ed;
+  --radius-window: 17px;
+  --radius-card: 10px;
+  --radius-control: 8px;
+  --shadow-window: 0 18px 44px rgba(31, 35, 44, 0.15), 0 2px 7px rgba(31, 35, 44, 0.08);
+}

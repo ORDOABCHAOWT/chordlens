@@ -1,0 +1,98 @@
+{
+  "documentType": "codex-security.scan-manifest",
+  "scan": {
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "8a5db6ef2c6dd936be68aa901105bb1ac08aa49352b718222a5e3abad906d0a3"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "cceb777d780ebd80512fb45b1b2627f55d6d972ace817a1ea123c108c9fc65ae"
+      }
+    ],
+    "completedAt": "2026-08-11T12:07:21.928166Z",
+    "coverageRef": "coverage.json",
+    "findingsRef": "findings.json",
+    "id": "40cb4b46-78ca-44a8-8568-34bccdeb22a6",
+    "producer": {
+      "name": "codex-security-plugin",
+      "version": "0.1.18"
+    },
+    "scope": {
+      "artifactsReviewed": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src-tauri/src/**/*.rs",
+        "src-tauri/tauri.conf.json",
+        "src-tauri/capabilities/default.json",
+        "src-tauri/Cargo.toml",
+        "engine/basic-pitch/transcribe.py",
+        "package.json",
+        "vite.config.ts",
+        "index.html",
+        "tests/**/*.ts"
+      ],
+      "context": "User requested a post-development Codex Security standard scan focused on Tauri trust boundaries, local files, subprocesses, SQLite, audio parsing, and frontend-to-Rust commands.",
+      "excludePaths": [],
+      "includePaths": [
+        "."
+      ],
+      "limitations": [
+        "Third-party dependency vulnerability databases were not queried because this was an offline source scan.",
+        "Generated schemas, compiled targets, bundled app copies, dependency trees, and binary image assets were excluded from manual source review."
+      ],
+      "runtimeStatus": "Static source validation plus the project's previously completed typecheck, lint, unit, browser, Rust, and native-window verification. No hostile media file was executed during the security scan.",
+      "summary": "Standard static security review of the ChordLens product source across the React/TypeScript renderer, Tauri/Rust backend, SQLite integration, audio import and browser analysis, Python Basic Pitch adapter, capabilities, and packaging configuration.",
+      "validationMode": "Independent baseline audit and two focused investigations, followed by parent-led source validation and attack-path calibration."
+    },
+    "sealedAt": "2026-08-11T12:07:21.928166Z",
+    "startedAt": "2026-08-11T11:54:57.475732Z",
+    "status": "completed",
+    "target": {
+      "displayName": "ChordLens",
+      "kind": "directory_snapshot",
+      "snapshotDigest": "codex-security-snapshot/v1:sha256:c1f8e88d0a66e59b5901218013b92b35b213627c3132b9eaf00bbb550b06626d",
+      "targetId": "target_sha256_bf9bcf12becdffcba0407391de7aafaeaee78cd48817972b1a85764c9130eecd"
+    },
+    "threatModel": {
+      "assets": [
+        "Application and desktop-session availability",
+        "User microphone privacy",
+        "User-selected local audio and file metadata",
+        "Transcription and chord-analysis integrity",
+        "Local SQLite library integrity"
+      ],
+      "assumptions": [
+        "The application runs as the current desktop user without elevated privileges",
+        "Audio import is user initiated through the native or browser file picker",
+        "The production window loads bundled local content only",
+        "Optional Basic Pitch and librosa installations are local dependencies outside this source review"
+      ],
+      "attackerCapabilities": [
+        "Supply a crafted, oversized, highly compressed, very long, or malformed local audio file and persuade the user to import it",
+        "Influence audio container bytes, decoded duration, and generated event density",
+        "Cause ordinary workspace navigation while recording is active",
+        "No remote code execution, remote content source, or pre-existing renderer compromise is assumed"
+      ],
+      "securityObjectives": [
+        "Bound memory, CPU, subprocess runtime, output size, and concurrency for untrusted media",
+        "Stop microphone capture whenever recording ends, errors, or the owning view unmounts",
+        "Release renderer audio resources on failure and replacement",
+        "Keep SQL grammar, filesystem scope, and process execution independent of untrusted strings",
+        "Prevent untrusted strings from reaching executable HTML or script contexts"
+      ],
+      "summary": "ChordLens is a single-user, local-first macOS desktop application. Its principal untrusted input is user-selected or recorded audio. Security-sensitive boundaries are the renderer-to-Tauri IPC bridge, file-dialog-to-decoder flow, Rust-to-Python subprocess boundary, microphone permission lifecycle, and local SQLite persistence. No network service, remote navigation source, tenant boundary, or demonstrated renderer script-injection sink exists in the reviewed snapshot.",
+      "trustBoundaries": [
+        "User-supplied audio file into Tauri filesystem and browser media decoders",
+        "React renderer into Tauri custom command handlers",
+        "Rust backend into the Python Basic Pitch process and its native media libraries",
+        "Operating-system microphone permission into the mounted transcription UI lifecycle",
+        "Renderer state and song metadata into SQLite persistence"
+      ]
+    }
+  },
+  "schemaVersion": "1.0"
+}

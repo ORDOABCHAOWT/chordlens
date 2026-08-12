@@ -1,0 +1,96 @@
+{
+  "documentType": "codex-security.scan-manifest",
+  "scan": {
+    "artifacts": [
+      {
+        "mediaType": "application/json",
+        "path": "findings.json",
+        "sha256": "e8145b1ce7b17ba41c506ffde914d638ab71255fd527bb95b8bbe4ca4f4ab856"
+      },
+      {
+        "mediaType": "application/json",
+        "path": "coverage.json",
+        "sha256": "9da97a765f1b9ac7f1c33bf321f4a86199e4de58490b53ee0df542044eeda37f"
+      }
+    ],
+    "completedAt": "2026-08-11T13:31:53.690069Z",
+    "coverageRef": "coverage.json",
+    "findingsRef": "findings.json",
+    "id": "8b7e3447-c5fc-4d7e-91ba-b109dd276425",
+    "producer": {
+      "name": "codex-security-plugin",
+      "version": "0.1.18"
+    },
+    "scope": {
+      "artifactsReviewed": [
+        "src/",
+        "src-tauri/src/",
+        "src-tauri/tauri.conf.json",
+        "src-tauri/capabilities/default.json",
+        "engine/basic-pitch/transcribe.py",
+        "package.json",
+        "pnpm-lock.yaml",
+        "src-tauri/Cargo.toml",
+        "src-tauri/Cargo.lock",
+        "tests/"
+      ],
+      "context": "\u5728\u9879\u76ee\u5f00\u53d1\u5b8c\u6210\u540e\uff0c\u5bf9 ChordLens \u6574\u4e2a\u4ee3\u7801\u4ed3\u5e93\u8fdb\u884c\u4e00\u8f6e\u6807\u51c6\u4ee3\u7801\u5b89\u5168\u6027\u5ba1\u67e5\u3002",
+      "excludePaths": [],
+      "includePaths": [
+        "."
+      ],
+      "limitations": [
+        "Generated build artifacts and installed dependency bodies were excluded in favor of authoritative source, manifests, and lockfiles.",
+        "No online vulnerability-database query was performed."
+      ],
+      "runtimeStatus": "Static source review; no network access or external dependency advisory lookup.",
+      "summary": "Standard offline source audit of the current ChordLens repository, covering application TypeScript/React, Tauri Rust code and capabilities, the Python Basic Pitch adapter, tests, manifests, and lockfiles.",
+      "validationMode": "Independent baseline plus two focused investigations, followed by parent source validation."
+    },
+    "sealedAt": "2026-08-11T13:31:53.690069Z",
+    "startedAt": "2026-08-11T13:14:41.869206Z",
+    "status": "completed",
+    "target": {
+      "displayName": "ChordLens",
+      "kind": "directory_snapshot",
+      "snapshotDigest": "codex-security-snapshot/v1:sha256:87ccb564a45df115853e9f565aff918d2d2a6d4d77595be1d99d1fe24d44fb1a",
+      "targetId": "target_sha256_bf9bcf12becdffcba0407391de7aafaeaee78cd48817972b1a85764c9130eecd"
+    },
+    "threatModel": {
+      "assets": [
+        "User-selected local audio files and their filesystem paths",
+        "Microphone audio and capture lifecycle",
+        "Local song library, transcription state, and SQLite database",
+        "Renderer, Python analyzer, and desktop availability",
+        "Privacy of exported metadata"
+      ],
+      "assumptions": [
+        "The application has one local main window, no network service, no remote capability origin, and no multi-user or tenant boundary",
+        "The current React source exposes no HTML/code execution sink and production CSP restricts scripts to self",
+        "Users intentionally choose files and approve microphone access, but selected media and exported-recipient context are untrusted"
+      ],
+      "attackerCapabilities": [
+        "Supply crafted, compressed, long, high-channel-count, or note-dense audio and persuade the local user to import it",
+        "Trigger rapid or overlapping local UI actions",
+        "Execute JavaScript in the main renderer only after a separate renderer compromise",
+        "Receive an analysis JSON that the user explicitly exports and shares"
+      ],
+      "securityObjectives": [
+        "Bound memory, CPU, process count, decoded work, and output for untrusted media",
+        "Stop every microphone track on stop, error, timeout, ownership loss, and unmount",
+        "Bind native file analysis to explicit user authorization and least privilege",
+        "Prevent stale analysis jobs from corrupting newer song state",
+        "Exclude internal filesystem metadata from ordinary portable exports"
+      ],
+      "summary": "ChordLens is a local-first, single-user macOS Tauri application. Its principal risks arise when user-selected audio and microphone data cross into renderer media APIs or an optional Python analyzer, when renderer code invokes native commands, and when internal local metadata is persisted or exported.",
+      "trustBoundaries": [
+        "Browser or native file picker into the renderer",
+        "Renderer JavaScript across Tauri IPC into Rust commands",
+        "Rust process supervisor into Python, Basic Pitch, librosa, and media decoders",
+        "OS microphone permission into MediaRecorder and application-owned streams",
+        "Internal Song persistence model into portable JSON exports"
+      ]
+    }
+  },
+  "schemaVersion": "1.0"
+}

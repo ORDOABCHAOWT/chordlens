@@ -1,0 +1,581 @@
+{
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "automationDetails": {
+        "id": "8b7e3447-c5fc-4d7e-91ba-b109dd276425"
+      },
+      "properties": {
+        "codexSecuritySchemaVersion": "1.0",
+        "codexSecurityTargetKind": "directory_snapshot"
+      },
+      "results": [
+        {
+          "level": "note",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 220,
+                  "startLine": 205
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "affected_operation"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 155,
+                  "startLine": 137
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "entry_point"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 256,
+                  "startLine": 240
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:native-spawn-per-call"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 214,
+                  "startLine": 205
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:native-registered-commands"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 256,
+                  "startLine": 247
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "basic_pitch_available and run_basic_pitch can each spawn a Python process per IPC call; UI-only serialization does not protect the native trust boundary."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:1d2baff8d58c01bcd90eb3efe45c0c36b937d717edaf0133596be87076625a5c"
+          },
+          "properties": {
+            "category": "resource-exhaustion",
+            "confidence": "high",
+            "findingId": "csf_5181cb18fce54ddd1b9a8d74",
+            "occurrenceId": "occ_2233360cb33cdbfaedeb5dfe",
+            "severity": "low"
+          },
+          "ruleId": "resource-exhaustion.native-process-concurrency",
+          "ruleIndex": 5
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 180,
+                  "startLine": 167
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "source"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/audio/basicPitchEngine.ts"
+                },
+                "region": {
+                  "endLine": 15,
+                  "startLine": 13
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "sink"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 210,
+                  "startLine": 205
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The native run_basic_pitch command validates path shape, size, extension, and canonicalization but does not prove the path was authorized through the file picker."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:42825c5efe658762ef1165abf079241999ff0cd6bef8fe2e5824bf4eaf2f008d"
+          },
+          "properties": {
+            "category": "path-authorization",
+            "confidence": "high",
+            "findingId": "csf_2e2e912b93e7dbefff5f396a",
+            "occurrenceId": "occ_4b6c86ae4b0dda929f82afc1",
+            "severity": "low"
+          },
+          "ruleId": "path-authorization.native-audio-analysis",
+          "ruleIndex": 3
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 213,
+                  "startLine": 179
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "entry_point"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/app/UnifiedApp.tsx"
+                },
+                "region": {
+                  "endLine": 61,
+                  "startLine": 58
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "sink"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/app/store.ts"
+                },
+                "region": {
+                  "endLine": 61,
+                  "startLine": 55
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "affected_operation"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 220,
+                  "startLine": 205
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:analysis-local-guard"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 204,
+                  "startLine": 179
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The analysis single-flight flag belongs to a TranscribeWindow instance; switching workspaces discards it without cancelling the job, allowing a new job whose results can be overwritten by the older completion."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:4853825ad8fc62ff4fa9f7198845edbe0b5cc4544a1b858da586efd6031d89f2"
+          },
+          "properties": {
+            "category": "concurrency-race",
+            "confidence": "high",
+            "findingId": "csf_4f50014b75d91c70304f95e5",
+            "occurrenceId": "occ_4d9bffe9e9ab911d062831bc",
+            "severity": "medium"
+          },
+          "ruleId": "concurrency-race.analysis-job-lifecycle",
+          "ruleIndex": 0
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/audio/audioPolicy.ts"
+                },
+                "region": {
+                  "endLine": 3,
+                  "startLine": 1
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "source"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/audio/filePicker.ts"
+                },
+                "region": {
+                  "endLine": 46,
+                  "startLine": 40
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "sink"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/audio/browserAnalysisEngine.ts"
+                },
+                "region": {
+                  "endLine": 68,
+                  "startLine": 56
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "sink"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "engine/basic-pitch/transcribe.py"
+                },
+                "region": {
+                  "endLine": 64,
+                  "startLine": 54
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src-tauri/src/lib.rs"
+                },
+                "region": {
+                  "endLine": 223,
+                  "startLine": 205
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:browser-full-decode"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/audio/browserAnalysisEngine.ts"
+                },
+                "region": {
+                  "endLine": 62,
+                  "startLine": 56
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "The 100 MB and one-hour policy bounds compressed input and nominal duration but not decoded samples, channels, peak memory, or model work; browser and Python paths fully materialize accepted media."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:ee6ade6a1742dc764c9d5237170ef21882fa071509373834a53c29033b318b1a"
+          },
+          "properties": {
+            "category": "resource-exhaustion",
+            "confidence": "high",
+            "findingId": "csf_0c27b527cee694806b203752",
+            "occurrenceId": "occ_6e1fdbcea1ffcdee104e7db4",
+            "severity": "low"
+          },
+          "ruleId": "resource-exhaustion.decoded-audio-budget",
+          "ruleIndex": 4
+        },
+        {
+          "level": "warning",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 258,
+                  "startLine": 225
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "cleanup"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 85,
+                  "startLine": 68
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:mic-pending-gap"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 235,
+                  "startLine": 225
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "evidence:mic-ref-cleanup"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 70,
+                  "startLine": 68
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Record remains startable while getUserMedia is pending, so overlapping acquisitions overwrite shared refs and can leave an earlier microphone stream recording beyond Stop, timeout, or workspace cleanup."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:54aec32ef8f370b72c60ad9e1decef187e5c7c6a6221447fd3d962f7fdeb8c12"
+          },
+          "properties": {
+            "category": "concurrency-race",
+            "confidence": "high",
+            "findingId": "csf_0a8926c0de1858e211f0484b",
+            "occurrenceId": "occ_83046d968d166c84135b9371",
+            "severity": "medium"
+          },
+          "ruleId": "concurrency-race.microphone-acquisition",
+          "ruleIndex": 1
+        },
+        {
+          "level": "note",
+          "locations": [
+            {
+              "message": {
+                "text": "root_control"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 272,
+                  "startLine": 266
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "source"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/services/audio/filePicker.ts"
+                },
+                "region": {
+                  "endLine": 46,
+                  "startLine": 34
+                }
+              }
+            },
+            {
+              "message": {
+                "text": "propagation"
+              },
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/features/transcribe/TranscribeWindow.tsx"
+                },
+                "region": {
+                  "endLine": 194,
+                  "startLine": 193
+                }
+              }
+            }
+          ],
+          "message": {
+            "text": "Export serializes the complete Song object, including the native picker path, so a shared analysis JSON can reveal the account name and directory layout."
+          },
+          "partialFingerprints": {
+            "codexSecurity/v1": "codex-security/v1:sha256:d06b9afef4211687f9e53fd3f20f1bf468046bb8001692ed1f75b0b7484ecbb5"
+          },
+          "properties": {
+            "category": "information-disclosure",
+            "confidence": "high",
+            "findingId": "csf_97fe82bdcfc2130b243c9a5d",
+            "occurrenceId": "occ_9da05a4abdd40bcf8b03de39",
+            "severity": "low"
+          },
+          "ruleId": "information-disclosure.export-local-path",
+          "ruleIndex": 2
+        }
+      ],
+      "tool": {
+        "driver": {
+          "name": "Codex Security",
+          "rules": [
+            {
+              "id": "concurrency-race.analysis-job-lifecycle",
+              "name": "concurrency-race.analysis-job-lifecycle",
+              "properties": {
+                "tags": [
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "concurrency-race.analysis-job-lifecycle"
+              }
+            },
+            {
+              "id": "concurrency-race.microphone-acquisition",
+              "name": "concurrency-race.microphone-acquisition",
+              "properties": {
+                "tags": [
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "concurrency-race.microphone-acquisition"
+              }
+            },
+            {
+              "id": "information-disclosure.export-local-path",
+              "name": "information-disclosure.export-local-path",
+              "properties": {
+                "tags": [
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "information-disclosure.export-local-path"
+              }
+            },
+            {
+              "id": "path-authorization.native-audio-analysis",
+              "name": "path-authorization.native-audio-analysis",
+              "properties": {
+                "tags": [
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "path-authorization.native-audio-analysis"
+              }
+            },
+            {
+              "id": "resource-exhaustion.decoded-audio-budget",
+              "name": "resource-exhaustion.decoded-audio-budget",
+              "properties": {
+                "tags": [
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "resource-exhaustion.decoded-audio-budget"
+              }
+            },
+            {
+              "id": "resource-exhaustion.native-process-concurrency",
+              "name": "resource-exhaustion.native-process-concurrency",
+              "properties": {
+                "tags": [
+                  "security"
+                ]
+              },
+              "shortDescription": {
+                "text": "resource-exhaustion.native-process-concurrency"
+              }
+            }
+          ],
+          "version": "0.1.18"
+        }
+      }
+    }
+  ],
+  "version": "2.1.0"
+}

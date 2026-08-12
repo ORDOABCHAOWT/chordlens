@@ -1,0 +1,110 @@
+{
+  "completeness": "complete",
+  "deferred": [],
+  "documentType": "codex-security.coverage",
+  "excludePaths": [],
+  "explicitExclusions": [
+    {
+      "pattern": "node_modules/**",
+      "reason": "Third-party installed dependency sources were outside the offline product-source audit."
+    },
+    {
+      "pattern": "src-tauri/target/**",
+      "reason": "Compiled Rust build outputs were not source review targets."
+    },
+    {
+      "pattern": "dist/**",
+      "reason": "Generated frontend bundles were covered through their source files."
+    },
+    {
+      "pattern": "release/**",
+      "reason": "Bundled application copies duplicate reviewed source/resources and contain compiled artifacts."
+    },
+    {
+      "pattern": "src-tauri/gen/**",
+      "reason": "Tauri-generated schemas were treated as generated build metadata."
+    },
+    {
+      "pattern": "src-tauri/icons/**",
+      "reason": "Binary and vector application icon assets contain no executable product logic."
+    },
+    {
+      "pattern": "visual-tests/**",
+      "reason": "Generated visual regression images and reports contain no executable product logic."
+    }
+  ],
+  "includePaths": [
+    "."
+  ],
+  "inventoryStrategy": "directory",
+  "mode": "repository",
+  "openQuestions": [],
+  "scanId": "40cb4b46-78ca-44a8-8568-34bccdeb22a6",
+  "schemaVersion": "1.0",
+  "surfaces": [
+    {
+      "disposition": "no_issue_found",
+      "id": "surface-tauri-ipc-sqlite",
+      "label": "Tauri IPC commands and SQLite persistence",
+      "notes": "Queries use static SQL and positional parameters; database location is fixed under app data. Arbitrary renderer-path concerns lacked an independently reachable renderer attacker and raw-file exfiltration.",
+      "receiptRefs": [],
+      "riskArea": "Native command exposure, SQL injection, path handling, database integrity"
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-audio-import",
+      "label": "Audio picker, renderer ingestion, and browser decoding",
+      "notes": "Whole-file reads, decoding, and duration-dependent analysis lack centralized resource bounds.",
+      "receiptRefs": [],
+      "riskArea": "Untrusted media parsing and resource exhaustion"
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-basic-pitch",
+      "label": "Rust-to-Python Basic Pitch subprocess",
+      "notes": "Shell injection was rejected because arguments are passed without a shell; runtime and output remain unbounded.",
+      "receiptRefs": [],
+      "riskArea": "Process execution, media parsing, CPU/memory/output bounds"
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-microphone",
+      "label": "Microphone capture and MediaRecorder lifecycle",
+      "notes": "Explicit Stop releases tracks, but unmount and setup failure do not.",
+      "receiptRefs": [],
+      "riskArea": "Microphone privacy and resource lifecycle"
+    },
+    {
+      "disposition": "reported",
+      "id": "surface-renderer-resources",
+      "label": "Blob URL and AudioContext ownership",
+      "notes": "Import URLs are replaced without revocation and failed analysis bypasses AudioContext.close.",
+      "receiptRefs": [],
+      "riskArea": "Renderer memory and audio-resource cleanup"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface-renderer-injection",
+      "label": "React rendering, CSP, and remote-content exposure",
+      "notes": "CSP is disabled as defense-in-depth debt, but no remote content source, navigation route, network client, innerHTML/eval sink, or unsafe React rendering path was found.",
+      "receiptRefs": [],
+      "riskArea": "XSS and native-capability escalation"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface-filesystem-capability",
+      "label": "Dialog and filesystem capability scope",
+      "notes": "The normal flow is user initiated and capability is local-window only. The custom Basic Pitch command accepts a path, but no realistic independent attacker route to renderer execution or raw-file disclosure was established.",
+      "receiptRefs": [],
+      "riskArea": "Local file confidentiality"
+    },
+    {
+      "disposition": "no_issue_found",
+      "id": "surface-export-state",
+      "label": "Export, local state, and song metadata",
+      "notes": "React escapes strings, export is browser-managed, SQLite uses parameters, and no secrets or network tokens were present.",
+      "receiptRefs": [],
+      "riskArea": "Path traversal, persistent injection, and sensitive-data exposure"
+    }
+  ]
+}
