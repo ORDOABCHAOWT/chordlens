@@ -197,7 +197,7 @@ body[data-view="transcribe"] .single-view > .transcribe-window { bottom: 37px; }
 .diagram-barre { stroke: #111214; stroke-width: 9; stroke-linecap: round; }
 .diagram-marker { fill: #15161a; font-size: 10px; }
 .diagram-fret-label { fill: #3e3f44; font-size: 8px; }
-.diagram-base { fill: #36373c; font-size: 9px; }
+.guitar-diagram--compact .diagram-fret-label { font-size: 7px; }
 .alternate-section { height: 178px; padding: 18px 10px 0 15px; border-bottom: 1px solid var(--border-soft); }
 .inspector-row { display: flex; justify-content: space-between; align-items: center; }
 .inspector-row span { font-size: 9px; }

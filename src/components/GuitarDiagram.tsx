@@ -10,9 +10,11 @@ interface GuitarDiagramProps {
 export const GuitarDiagram = memo(function GuitarDiagram({ voicing, compact = false, className = "" }: GuitarDiagramProps) {
   const width = compact ? 78 : 126;
   const height = compact ? 86 : 142;
-  const left = compact ? 7 : 13;
+  // Keep a dedicated left gutter for high-fret labels. The grid itself never
+  // shares this space, so labels such as "8fr" remain readable at every size.
+  const left = compact ? 20 : 26;
   const top = compact ? 18 : 34;
-  const gridWidth = compact ? 68 : 104;
+  const gridWidth = compact ? 53 : 93;
   const gridHeight = compact ? 58 : 103;
   const stringGap = gridWidth / 5;
   const fretGap = gridHeight / 4;
@@ -21,7 +23,7 @@ export const GuitarDiagram = memo(function GuitarDiagram({ voicing, compact = fa
   const barre = voicing.barre;
 
   return (
-    <svg className={`guitar-diagram ${className}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Guitar voicing ${voicing.frets.join(" ")}`}>
+    <svg className={`guitar-diagram ${compact ? "guitar-diagram--compact" : ""} ${className}`} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Guitar voicing ${voicing.frets.join(" ")}`}>
       {voicing.frets.map((fret, index) => (
         <text key={`marker-${index}`} x={left + index * stringGap} y={compact ? 10 : 16} textAnchor="middle" className="diagram-marker">
           {fret === "x" ? "×" : fret === 0 ? "○" : ""}
@@ -33,7 +35,11 @@ export const GuitarDiagram = memo(function GuitarDiagram({ voicing, compact = fa
       {Array.from({ length: 5 }, (_, index) => (
         <line key={`f-${index}`} x1={left} y1={top + index * fretGap} x2={left + gridWidth} y2={top + index * fretGap} className={index === 0 && base === 1 ? "diagram-nut" : "diagram-line"} />
       ))}
-      {base > 1 && <text x={4} y={top + fretGap * 0.75} className="diagram-fret-label">{base}fr</text>}
+      {base > 1 && (
+        <text x={left - 5} y={top + fretGap / 2} textAnchor="end" dominantBaseline="middle" className="diagram-fret-label">
+          {base}fr
+        </text>
+      )}
       {barre && (() => {
         const fret = displayFret(barre.fret);
         if (fret < 1 || fret > 4) return null;
@@ -48,7 +54,6 @@ export const GuitarDiagram = memo(function GuitarDiagram({ voicing, compact = fa
         if (shown < 1 || shown > 4) return null;
         return <circle key={`dot-${index}`} cx={left + index * stringGap} cy={top + (shown - 0.5) * fretGap} r={compact ? 3.7 : 5.2} className="diagram-dot" />;
       })}
-      {base > 1 && <text x={left + gridWidth / 2} y={height - 4} textAnchor="middle" className="diagram-base">{base}fr</text>}
     </svg>
   );
 });
