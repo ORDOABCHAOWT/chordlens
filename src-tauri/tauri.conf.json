@@ -26,7 +26,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost blob: data:; media-src 'self' asset: http://asset.localhost blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'"
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'"
     }
   },
   "bundle": {
@@ -39,10 +39,9 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": ["../engine/basic-pitch/transcribe.py"],
     "category": "Music",
-    "shortDescription": "Hear the notes. Understand the harmony.",
-    "longDescription": "Local-first music transcription, chord analysis, score and guitar voicing utility for macOS.",
+    "shortDescription": "Explore chords, notes, and guitar voicings.",
+    "longDescription": "A local macOS chord tool with note-to-chord identification, chord formulas, and guitar voicing diagrams.",
     "macOS": {
       "entitlements": "Entitlements.plist",
       "infoPlist": "Info.plist",

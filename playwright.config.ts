@@ -11,7 +11,7 @@ export default defineConfig({
   },
   webServer: {
     command: "./node_modules/.bin/vite",
-    url: "http://127.0.0.1:1420/?view=design-preview",
+    url: "http://127.0.0.1:1420/",
     reuseExistingServer: true,
   },
 });

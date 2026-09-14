@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, Search, X } from "lucide-react";
+import { Check, Search, X } from "lucide-react";
 import { GuitarDiagram } from "../../components/GuitarDiagram";
-import { WindowShell } from "../../components/WindowShell";
 import { chordTypeLabel, describeChord, detectAndRankChords, displayNote, normalizeNote } from "../../music/chords";
 import { generateVoicings } from "../../music/voicings";
 
@@ -34,7 +33,7 @@ export function ChordLabWindow() {
 
   const ranked = useMemo(() => detectAndRankChords(notes, notes[0]), [notes]);
   const detected = ranked[selected] ?? ranked[0];
-  const result = mode === "notes" ? (detected ? describeChord(detected.symbol) : null) : describeChord(chordInput);
+  const result = useMemo(() => mode === "notes" ? (detected ? describeChord(detected.symbol) : null) : describeChord(chordInput), [mode, detected, chordInput]);
   const voicings = useMemo(() => result ? generateVoicings(result.symbol, result.notes, 3) : [], [result]);
   const related = useMemo(() => {
     if (!result) return [];
@@ -44,8 +43,11 @@ export function ChordLabWindow() {
       .filter((item): item is NonNullable<typeof item> => Boolean(item));
   }, [result]);
 
+  const matches = mode === "notes" ? ranked : related;
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (mode !== "notes" || document.activeElement?.tagName === "INPUT") return;
       if (event.key === "ArrowDown") setSelected((value) => Math.min(value + 1, Math.max(0, ranked.length - 1)));
       if (event.key === "ArrowUp") setSelected((value) => Math.max(0, value - 1));
       if (event.key === "Backspace" && mode === "notes" && document.activeElement?.tagName !== "INPUT") setNotes((value) => value.slice(0, -1));
@@ -77,7 +79,7 @@ export function ChordLabWindow() {
   };
 
   return (
-    <WindowShell className="chord-lab-window" title="Chord Lab">
+    <section className="window-shell chord-lab-window" aria-label="Chord Lab">
       <div className="lab-content">
         <div className="lab-workspace">
           <section className="lab-input-panel" aria-label="Chord input">
@@ -138,24 +140,23 @@ export function ChordLabWindow() {
                 </div>
                 {voicings[0] && <div className="guitar-stage"><GuitarDiagram voicing={voicings[0]} /><small>Standard tuning · suggested voicing</small></div>}
               </div>
-            ) : <div className="empty-result">Select at least two notes</div>}
+            ) : <div className="empty-result">{mode === "notes" ? "Select at least two notes" : "Enter a valid chord symbol"}</div>}
           </aside>
 
           <section className="lab-matches-panel" aria-label="Matching chords">
             <div className="lab-search-label">Search chord</div>
-            <div className="lab-search"><Search size={14} /><input value={result?.symbol ?? chordInput} onChange={(event) => setChordInput(event.target.value)} /><X size={13} /></div>
-            <div className="matching-label">Matching chords</div>
+            <div className="lab-search"><Search size={14} /><input aria-label="Search chord" value={mode === "notes" ? result?.symbol ?? "" : chordInput} onChange={(event) => { setMode("chord"); setChordInput(event.target.value); }} /><button aria-label="Clear chord search" onClick={() => { setMode("chord"); setChordInput(""); }}><X size={13} /></button></div>
+            <div className="matching-label">{mode === "notes" ? "Matching chords" : "Related chords"}</div>
             <div className="matching-list">
-              {related.map((item, index) => (
-                <button key={item.symbol} className={index === 0 ? "active" : ""} onClick={() => { setMode("chord"); setChordInput(item.symbol); }}>
+              {matches.map((item, index) => (
+                <button key={item.symbol} className={index === (mode === "notes" ? selected : 0) ? "active" : ""} onClick={() => { if (mode === "notes") setSelected(index); else setChordInput(item.symbol); }}>
                   <strong>{item.symbol}</strong><span>{chordTypeLabel(item.type, item.symbol)}</span><small>{item.notes.join(" · ")}</small>
                 </button>
               ))}
             </div>
-            <button className="view-results">View all results <ArrowRight size={14} /></button>
           </section>
         </div>
       </div>
-    </WindowShell>
+    </section>
   );
 }

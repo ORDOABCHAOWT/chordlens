@@ -21,6 +21,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - run: pnpm exec playwright install chromium
+      - run: pnpm test:ui
+      - run: pnpm test:visual
       - run: pnpm tauri build --bundles app
       - run: codesign --force --deep --sign - --options runtime --entitlements src-tauri/Entitlements.plist src-tauri/target/release/bundle/macos/ChordLens.app
       - run: codesign --verify --deep --strict src-tauri/target/release/bundle/macos/ChordLens.app

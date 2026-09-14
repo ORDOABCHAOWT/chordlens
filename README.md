@@ -1,31 +1,20 @@
 # ChordLens
 
-ChordLens is a local-first macOS music transcription and chord-analysis utility. Library, Transcribe, and Chord Lab live in one native, freely movable and resizable macOS window; switch with the top workspace control or `⌘1`–`⌘3`.
-
-![ChordLens transcription workspace](docs/app-overview.png)
-
-## Install
-
-Download the packaged macOS app from GitHub Releases, move it to `Applications`, and run it independently of the source checkout. The repository is only needed for development.
+ChordLens is a local macOS chord tool. It opens directly into Chord Lab, with note-to-chord identification, chord-to-note decomposition, accidental spelling, and standard-tuning guitar diagrams. Library, audio import, recording, transcription, and the audio database are no longer part of the app.
 
 ## Development
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm dev
 pnpm test
+pnpm test:ui
 pnpm test:visual
-pnpm tauri dev
+pnpm tauri build --bundles app
 ```
 
-Open `http://127.0.0.1:1420/?view=design-preview` for the fixed 1448×1086 visual-regression composition.
+The generated bundle is `src-tauri/target/release/bundle/macos/ChordLens.app`. It runs independently of the source checkout. CI runs the chord and interface regressions and builds a macOS artifact. Local builds use ad hoc signing; no microphone or file-reading permission is required.
 
-## Audio analysis
+## Guitar diagrams
 
-The app ships with a browser-native local analysis fallback and a stable `TranscriptionEngine` interface. `engine/basic-pitch/transcribe.py` is the optional offline Basic Pitch adapter used when the Python dependency is installed.
-
-Audio imports are checked locally and limited to 100 MB and one hour. The optional sidecar has bounded output and a three-minute deadline; recordings stop automatically after 15 minutes or whenever the Transcribe workspace closes.
-
-## Release
-
-The ready-to-run macOS bundle is available at `release/ChordLens.app`. The completed Codex Security report and remediation record are under `security-audit/2026-08-11/`.
+Strings run from low E at the left to high E at the right. × means muted, ○ means open. Asus2 defaults to the standard `x02200` shape. Generated positions are checked for complete chord-tone coverage and all pressed frets fit within the four displayed spaces. Suggested shapes are heuristics, not a guarantee of comfortable fingering for every player.
