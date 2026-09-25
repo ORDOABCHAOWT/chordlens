@@ -17,4 +17,6 @@ export interface GuitarVoicing {
   baseFret: number;
   notes: string[];
   difficulty: number;
+  /** A shape the user placed on the fretboard rather than a generated one. */
+  custom?: boolean;
 }

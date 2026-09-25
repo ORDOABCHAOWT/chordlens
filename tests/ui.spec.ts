@@ -1,40 +1,88 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
-test("opens only Chord Lab even with a saved retired workspace or legacy URL", async ({ page }) => {
+const key = (page: Page, name: string) => page.getByRole("button", { name: new RegExp(`^${name}，`) });
+const symbol = (page: Page) => page.locator(".sym");
+
+test("opens the chord workspace even with a saved retired workspace or legacy URL", async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem("chordlens-workspace", "library"));
   for (const url of ["/", "/?view=library", "/?view=transcribe", "/?view=design-preview"]) {
     await page.goto(url);
-    await expect(page.getByRole("region", { name: "Chord Lab", exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: "当前和弦" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Library|Transcribe|Record|Import/ })).toHaveCount(0);
     await expect(page.locator(".workspace-switcher, .library-window, .transcribe-window")).toHaveCount(0);
   }
   await page.keyboard.press("Meta+1");
-  await page.keyboard.press("Meta+2");
-  await expect(page.getByRole("button", { name: "Notes → Chord", exact: true })).toBeVisible();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "F7");
 });
 
-test("core chord controls and search remain functional", async ({ page }) => {
+test("typing a chord name drives the keys, the tones and the guitar", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".result-copy > strong")).toHaveText("F7");
-  await page.getByRole("button", { name: "♯ Sharps" }).click();
-  await page.getByRole("button", { name: "Add F♯", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Remove F♯", exact: true })).toHaveCount(2);
-  await page.locator(".selected-note-chip", { hasText: "F♯" }).click();
-  await page.getByRole("button", { name: "♭ Flats" }).click();
-  await expect(page.getByRole("button", { name: "Add G♭", exact: true })).toBeVisible();
-  await page.getByRole("textbox", { name: "Search chord" }).fill("Dm7");
-  await expect(page.locator(".result-copy > strong")).toHaveText("Dm7");
-  await expect(page.locator(".result-copy")).toContainText("D · F · A · C");
-  await page.getByRole("button", { name: "Clear chord search" }).click();
-  await expect(page.locator(".empty-result")).toHaveText("Enter a valid chord symbol");
+  await page.locator(".app").focus();
+  await page.keyboard.press("d");
+  await page.keyboard.type("m7");
+  await page.keyboard.press("Enter");
+  await expect(symbol(page)).toHaveAttribute("aria-label", "Dm7");
+  await expect(page.locator(".tone-note")).toHaveText(["D", "F", "A", "C"]);
+  await expect(page.getByRole("button", { name: /，点击移除$/ })).toHaveCount(4);
+  await expect(page.getByRole("img", { name: /^吉他指法 x x 0 2 1 1/ })).toBeVisible();
 });
 
-test("core panels stay accessible in the minimum native window", async ({ page }) => {
+test("escape restores the chord that was showing before typing", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("combobox").click();
+  await page.keyboard.type("Cmaj7");
+  await expect(symbol(page)).toHaveAttribute("aria-label", "Cmaj7");
+  await page.keyboard.press("Escape");
+  await expect(symbol(page)).toHaveAttribute("aria-label", "F7");
+});
+
+test("keys name the chord, the lowest key is the bass, and history can be undone", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /^清空/ }).click();
+  await expect(symbol(page)).toHaveText("从这里开始");
+  for (const name of ["E3", "G3", "C4"]) await key(page, name).click();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "C/E");
+  await expect(page.locator(".meta")).toContainText("第一转位");
+  await page.getByRole("button", { name: "撤销" }).click();
+  await expect(page.locator(".name-main")).toHaveText("小三度");
+  await page.getByRole("button", { name: "重做" }).click();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "C/E");
+  await page.getByRole("button", { name: "升半音" }).click();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "Db/F");
+});
+
+test("accidental spelling can be forced to sharps or flats", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "升号" }).click();
+  await expect(page.locator(".tone-note")).toHaveText(["F", "A", "C", "D♯"]);
+  await page.getByRole("button", { name: "降号" }).click();
+  await expect(page.locator(".tone-note")).toHaveText(["F", "A", "C", "E♭"]);
+});
+
+test("placing a shape on the fretboard names the chord", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "摆指型" }).click();
+  // F7 barre 1 3 1 2 1 1 → C major x 3 2 0 1 0
+  await page.getByTestId("string-1-top").click();
+  await page.getByTestId("string-3-fret-2").click();
+  await page.getByTestId("string-4-top").click();
+  await page.getByTestId("string-4-top").click();
+  await page.getByTestId("string-6-top").click();
+  await page.getByTestId("string-6-top").click();
+  await expect(page.getByRole("img", { name: /^吉他指法 x 3 2 0 1 0/ })).toBeVisible();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "C");
+  await page.getByRole("button", { name: "完成" }).click();
+  await expect(page.locator(".v-meta")).toContainText("自定义指型");
+});
+
+test("everything fits the minimum native window without scrolling", async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 650 });
   await page.goto("/");
-  await expect(page.locator(".lab-input-panel")).toBeVisible();
-  await expect(page.locator(".lab-preview-panel")).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(900);
-  await page.locator(".lab-content").evaluate((element) => { element.scrollTop = element.scrollHeight; });
-  await expect(page.getByRole("textbox", { name: "Search chord" })).toBeVisible();
+  for (const region of [".hero", ".gtr", ".dock"]) await expect(page.locator(region)).toBeVisible();
+  const [width, height] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.scrollHeight]);
+  expect(width).toBeLessThanOrEqual(900);
+  expect(height).toBeLessThanOrEqual(650);
+  const [diagram, meta] = await Promise.all([page.locator(".dg-lg").boundingBox(), page.locator(".v-meta").boundingBox()]);
+  expect(diagram!.y + diagram!.height).toBeLessThanOrEqual(meta!.y + 1);
 });

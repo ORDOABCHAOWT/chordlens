@@ -2,7 +2,7 @@ import { Note } from "@tonaljs/tonal";
 import { displayNote, normalizeNote } from "./chords";
 import type { GuitarVoicing } from "./types";
 
-const STANDARD_TUNING = [40, 45, 50, 55, 59, 64];
+export const STANDARD_TUNING = [40, 45, 50, 55, 59, 64];
 
 const KNOWN_VOICINGS: Record<string, Array<Array<number | "x">>> = {
   Asus2: [["x", 0, 2, 2, 0, 0]],
@@ -79,7 +79,7 @@ function inferBarre(frets: Array<number | "x">): GuitarVoicing["barre"] {
   return { fret: lowestPressed, fromString, toString };
 }
 
-function toVoicing(frets: Array<number | "x">): GuitarVoicing {
+export function toVoicing(frets: Array<number | "x">): GuitarVoicing {
   const positive = frets.filter((value): value is number => typeof value === "number" && value > 0);
   // Leave familiar open-position shapes at the nut. Higher shapes start at
   // their lowest pressed fret so all dots fit in the four displayed spaces.
@@ -93,18 +93,42 @@ function toVoicing(frets: Array<number | "x">): GuitarVoicing {
   };
 }
 
-export function generateVoicings(symbol: string, chordNotes: string[], limit = 12): GuitarVoicing[] {
+export interface VoicingOptions {
+  /** Pitch class that should sound lowest; defaults to the root. Slash chords keep only shapes with this bass when any exist. */
+  bassPc?: number;
+}
+
+/** Fret numbers low E to high E; compact form ("x02200") only when every fret is a single digit. */
+export function tabText(voicing: GuitarVoicing, compact = false): string {
+  return voicing.frets.join(compact && !voicing.frets.some((fret) => typeof fret === "number" && fret > 9) ? "" : " ");
+}
+
+export function soundingMidis(frets: Array<number | "x">): number[] {
+  return frets.flatMap((fret, index) => fret === "x" ? [] : [STANDARD_TUNING[index] + fret]);
+}
+
+export function generateVoicings(symbol: string, chordNotes: string[], limit = 12, settings: VoicingOptions = {}): GuitarVoicing[] {
   const target = new Set(chordNotes.map(pitchClass).filter((note) => note >= 0));
   // A six-string voicing cannot cover more than six distinct pitch classes.
   // Returning early also keeps malformed, near-chromatic input bounded.
   if (target.size === 0 || target.size > 6 || limit <= 0) return [];
   const root = pitchClass(chordNotes[0] ?? symbol);
-  const preferredShapes = KNOWN_VOICINGS[normalizeNote(symbol)] ?? [];
+  const bass = settings.bassPc ?? root;
+  const slash = bass !== root;
+  const preferredShapes = slash ? [] : KNOWN_VOICINGS[normalizeNote(symbol)] ?? [];
   const preferredOrder = new Map(preferredShapes.map((frets, index) => [frets.join(","), index]));
   const results: GuitarVoicing[] = preferredShapes
     .filter((frets) => hasExactTargetCoverage(frets, target) && fitsDiagram(frets))
     .map(toVoicing);
   const seen = new Set(results.map((voicing) => voicing.frets.join(",")));
+  // Lower positions read and play more easily; the wanted bass on the lowest string matters more for slash chords.
+  const preference = (frets: Array<number | "x">) => {
+    const pressed = frets.filter((value): value is number => typeof value === "number" && value > 0);
+    const position = pressed.length ? Math.max(0, Math.min(...pressed) - 1) * 0.3 : 0;
+    const lowest = frets.findIndex((fret) => fret !== "x");
+    const bassMatches = lowest >= 0 && typeof frets[lowest] === "number" && (STANDARD_TUNING[lowest] + frets[lowest]) % 12 === bass;
+    return position + (bassMatches ? (slash ? -4 : -2) : 0);
+  };
   const options = STANDARD_TUNING.map((openMidi) => {
     const matches: Array<number | "x"> = ["x"];
     for (let fret = 0; fret <= 12; fret += 1) if (target.has((openMidi + fret) % 12)) matches.push(fret);
@@ -114,11 +138,7 @@ export function generateVoicings(symbol: string, chordNotes: string[], limit = 1
   const generated: Array<{ frets: Array<number | "x">; score: number }> = [];
   const maxGenerated = 800;
   let worstGeneratedIndex = 0;
-  const generatedScore = (frets: Array<number | "x">) => {
-    const bassIndex = frets.findIndex((fret) => fret !== "x");
-    const rootBass = bassIndex >= 0 && typeof frets[bassIndex] === "number" && (STANDARD_TUNING[bassIndex] + frets[bassIndex]) % 12 === root ? -2 : 0;
-    return difficulty(frets) + rootBass;
-  };
+  const generatedScore = (frets: Array<number | "x">) => difficulty(frets) + preference(frets);
   const findWorstGenerated = () => {
     worstGeneratedIndex = generated.reduce((worst, candidate, index) => candidate.score > generated[worst].score ? index : worst, 0);
   };
@@ -160,8 +180,12 @@ export function generateVoicings(symbol: string, chordNotes: string[], limit = 1
   visit(0, []);
   results.push(...generated.map((candidate) => toVoicing(candidate.frets)));
 
-  return results
-    .filter((voicing) => hasExactTargetCoverage(voicing.frets, target) && fitsDiagram(voicing.frets))
+  let playable = results.filter((voicing) => hasExactTargetCoverage(voicing.frets, target) && fitsDiagram(voicing.frets));
+  if (slash) {
+    const withBass = playable.filter((voicing) => pitchClass(voicing.notes[0] ?? "") === bass);
+    if (withBass.length) playable = withBass;
+  }
+  return playable
     .sort((a, b) => {
       const aPreferred = preferredOrder.get(a.frets.join(","));
       const bPreferred = preferredOrder.get(b.frets.join(","));
@@ -170,9 +194,7 @@ export function generateVoicings(symbol: string, chordNotes: string[], limit = 1
         if (bPreferred === undefined) return -1;
         return aPreferred - bPreferred;
       }
-      const aRootBass = pitchClass(a.notes[0] ?? "") === root ? -2 : 0;
-      const bRootBass = pitchClass(b.notes[0] ?? "") === root ? -2 : 0;
-      return a.difficulty + aRootBass - (b.difficulty + bRootBass);
+      return a.difficulty + preference(a.frets) - (b.difficulty + preference(b.frets));
     })
     .slice(0, limit);
 }

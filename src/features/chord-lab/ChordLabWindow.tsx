@@ -1,162 +1,130 @@
-import { useEffect, useMemo, useState } from "react";
-import { Check, Search, X } from "lucide-react";
-import { GuitarDiagram } from "../../components/GuitarDiagram";
-import { chordTypeLabel, describeChord, detectAndRankChords, displayNote, normalizeNote } from "../../music/chords";
-import { generateVoicings } from "../../music/voicings";
-
-const PITCH_OPTIONS = [
-  { sharp: "C", flat: "C" },
-  { sharp: "C#", flat: "Db" },
-  { sharp: "D", flat: "D" },
-  { sharp: "D#", flat: "Eb" },
-  { sharp: "E", flat: "E" },
-  { sharp: "F", flat: "F" },
-  { sharp: "F#", flat: "Gb" },
-  { sharp: "G", flat: "G" },
-  { sharp: "G#", flat: "Ab" },
-  { sharp: "A", flat: "A" },
-  { sharp: "A#", flat: "Bb" },
-  { sharp: "B", flat: "B" },
-] as const;
-
-function pitchIndex(note: string) {
-  const normalized = normalizeNote(note);
-  return PITCH_OPTIONS.findIndex((option) => option.sharp === normalized || option.flat === normalized);
-}
+import { useCallback, useEffect, useRef, useState } from "react";
+import { parseChordSymbol, prettyAccidentals } from "../../music/analysis";
+import { ChordHero } from "./ChordHero";
+import type { ChordSearchHandle } from "./ChordSearch";
+import { GuitarPanel } from "./GuitarPanel";
+import { PianoKeys } from "./PianoKeys";
+import { T } from "./strings";
+import { Toolbar } from "./Toolbar";
+import { useChordLab } from "./useChordLab";
 
 export function ChordLabWindow() {
-  const [mode, setMode] = useState<"notes" | "chord">("notes");
-  const [notes, setNotes] = useState(["F", "A", "C", "Eb"]);
-  const [spelling, setSpelling] = useState<"sharp" | "flat">("flat");
-  const [chordInput, setChordInput] = useState("F7");
-  const [selected, setSelected] = useState(0);
-
-  const ranked = useMemo(() => detectAndRankChords(notes, notes[0]), [notes]);
-  const detected = ranked[selected] ?? ranked[0];
-  const result = useMemo(() => mode === "notes" ? (detected ? describeChord(detected.symbol) : null) : describeChord(chordInput), [mode, detected, chordInput]);
-  const voicings = useMemo(() => result ? generateVoicings(result.symbol, result.notes, 3) : [], [result]);
-  const related = useMemo(() => {
-    if (!result) return [];
-    const root = normalizeNote(result.root);
-    return [result.symbol, `${root}maj7`, `${root}m7`]
-      .map((symbol) => describeChord(symbol))
-      .filter((item): item is NonNullable<typeof item> => Boolean(item));
-  }, [result]);
-
-  const matches = mode === "notes" ? ranked : related;
+  const lab = useChordLab();
+  const root = useRef<HTMLDivElement>(null);
+  const search = useRef<ChordSearchHandle>(null);
+  const [hotPc, setHotPc] = useState<number | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const { analysis, voicings, voicingIndex, editing } = lab;
 
   useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 1600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  const copy = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).then(() => setToast(`${T.copied}  ${text}`), () => setToast(T.copyFailed));
+  }, []);
+
+  const focusWorkspace = useCallback(() => root.current?.focus({ preventScroll: true }), []);
+
+  // Keyboard-first use. Typing into the search field is left alone; everything else is handled here.
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (mode !== "notes" || document.activeElement?.tagName === "INPUT") return;
-      if (event.key === "ArrowDown") setSelected((value) => Math.min(value + 1, Math.max(0, ranked.length - 1)));
-      if (event.key === "ArrowUp") setSelected((value) => Math.max(0, value - 1));
-      if (event.key === "Backspace" && mode === "notes" && document.activeElement?.tagName !== "INPUT") setNotes((value) => value.slice(0, -1));
+      const target = event.target as HTMLElement | null;
+      const inField = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA";
+      const command = event.metaKey || event.ctrlKey;
+      const key = event.key;
+      if (command && key.toLowerCase() === "k") { event.preventDefault(); search.current?.open(); return; }
+      if (inField) return;
+      if (command && key.toLowerCase() === "z") { event.preventDefault(); if (event.shiftKey) lab.redo(); else lab.undo(); return; }
+      if (command && (key === "Backspace" || key === "Delete")) { event.preventDefault(); lab.clear(); return; }
+      if (command || event.altKey) return;
+      if (key === "Escape" && editing) { lab.setEditing(false); return; }
+      if (key === "/") { event.preventDefault(); search.current?.open(); return; }
+      if (/^[a-gA-G]$/.test(key)) { event.preventDefault(); search.current?.open(key.toUpperCase()); return; }
+      if (key === " ") {
+        if (target?.tagName === "BUTTON" && target !== root.current) return;
+        event.preventDefault(); lab.play(); return;
+      }
+      if (key === "ArrowLeft" || key === "ArrowRight") {
+        event.preventDefault();
+        const direction = key === "ArrowLeft" ? -1 : 1;
+        if (editing) lab.shiftShape(direction); else lab.setVoicingIndex(voicingIndex + direction);
+        return;
+      }
+      if (key === "ArrowUp" || key === "ArrowDown") { event.preventDefault(); lab.stepName(key === "ArrowUp" ? -1 : 1); return; }
+      if (key === "[" || key === "]") { event.preventDefault(); lab.transpose(key === "[" ? -1 : 1); return; }
+      if (key === "Backspace" || key === "Delete") { event.preventDefault(); lab.removeLast(); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [mode, ranked.length]);
+  }, [editing, lab, voicingIndex]);
 
-  const removeNote = (index: number) => {
-    setNotes((value) => value.filter((_, itemIndex) => itemIndex !== index));
-    setSelected(0);
-  };
-
-  const togglePitch = (index: number) => {
-    setNotes((value) => {
-      const existingIndex = value.findIndex((note) => pitchIndex(note) === index);
-      if (existingIndex >= 0) return value.filter((_, itemIndex) => itemIndex !== existingIndex);
-      return [...value, PITCH_OPTIONS[index][spelling]];
-    });
-    setSelected(0);
-  };
-
-  const changeSpelling = (next: "sharp" | "flat") => {
-    setSpelling(next);
-    setNotes((value) => value.map((note) => {
-      const option = PITCH_OPTIONS[pitchIndex(note)];
-      return option ? option[next] : note;
-    }));
-  };
-
+  const chord = analysis.chord;
   return (
-    <section className="window-shell chord-lab-window" aria-label="Chord Lab">
-      <div className="lab-content">
-        <div className="lab-workspace">
-          <section className="lab-input-panel" aria-label="Chord input">
-            <div className="lab-segmented">
-              <button className={mode === "notes" ? "active" : ""} onClick={() => setMode("notes")}>Notes → Chord</button>
-              <button className={mode === "chord" ? "active" : ""} onClick={() => setMode("chord")}>Chord → Notes</button>
-            </div>
-            {mode === "notes" ? (
-              <>
-                <div className="lab-label selected-notes-label">
-                  <div><span>Selected notes</span><small>Click a note to remove it · first note is the bass</small></div>
-                  <button className="clear-notes" disabled={!notes.length} onClick={() => { setNotes([]); setSelected(0); }}>Clear all <X size={11} /></button>
-                </div>
-                <div className="note-chips">
-                  {notes.length ? notes.map((note, index) => (
-                    <button className={`selected-note-chip ${index === 0 ? "bass" : ""}`} key={`${note}-${index}`} aria-label={`Remove ${displayNote(note)}`} title={`Remove ${displayNote(note)}`} onClick={() => removeNote(index)}>
-                      <span>{displayNote(note)}</span>{index === 0 && <small>Bass</small>}<X size={12} />
-                    </button>
-                  )) : <span className="no-notes">No notes selected</span>}
-                </div>
-                <div className="note-picker-heading">
-                  <span>Add or remove notes</span>
-                  <div className="accidental-toggle" aria-label="Accidental spelling">
-                    <button className={spelling === "sharp" ? "active" : ""} aria-pressed={spelling === "sharp"} onClick={() => changeSpelling("sharp")}>♯ Sharps</button>
-                    <button className={spelling === "flat" ? "active" : ""} aria-pressed={spelling === "flat"} onClick={() => changeSpelling("flat")}>♭ Flats</button>
-                  </div>
-                </div>
-                <div className="note-palette">
-                  {PITCH_OPTIONS.map((option, index) => {
-                    const active = notes.some((note) => pitchIndex(note) === index);
-                    const note = option[spelling];
-                    const label = displayNote(note);
-                    return (
-                      <button key={index} className={active ? "active" : ""} aria-pressed={active} aria-label={`${active ? "Remove" : "Add"} ${label}`} onClick={() => togglePitch(index)}>
-                        <span>{label}</span>{active && <Check size={12} strokeWidth={2.4} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="lab-label"><span>Enter Chord</span><button onClick={() => setChordInput("")}>Clear&nbsp; <X size={11} /></button></div>
-                <div className="chord-entry"><Search size={14} /><input value={chordInput} onChange={(event) => setChordInput(event.target.value)} placeholder="F7" autoFocus /></div>
-              </>
-            )}
-          </section>
-
-          <aside className="lab-preview-panel" aria-label="Chord and guitar preview">
-            {result ? (
-              <div className="chord-result-card">
-                <span className="preview-eyebrow">Detected chord</span>
-                <div className="result-copy">
-                  <strong>{result.symbol}</strong>
-                  <span>{result.type}</span>
-                  <small>{result.notes.map(displayNote).join(" · ")}</small>
-                  {mode === "chord" && <small className="formula">Formula&nbsp;&nbsp; {result.intervals.join(" · ")}</small>}
-                </div>
-                {voicings[0] && <div className="guitar-stage"><GuitarDiagram voicing={voicings[0]} /><small>Standard tuning · suggested voicing</small></div>}
-              </div>
-            ) : <div className="empty-result">{mode === "notes" ? "Select at least two notes" : "Enter a valid chord symbol"}</div>}
-          </aside>
-
-          <section className="lab-matches-panel" aria-label="Matching chords">
-            <div className="lab-search-label">Search chord</div>
-            <div className="lab-search"><Search size={14} /><input aria-label="Search chord" value={mode === "notes" ? result?.symbol ?? "" : chordInput} onChange={(event) => { setMode("chord"); setChordInput(event.target.value); }} /><button aria-label="Clear chord search" onClick={() => { setMode("chord"); setChordInput(""); }}><X size={13} /></button></div>
-            <div className="matching-label">{mode === "notes" ? "Matching chords" : "Related chords"}</div>
-            <div className="matching-list">
-              {matches.map((item, index) => (
-                <button key={item.symbol} className={index === (mode === "notes" ? selected : 0) ? "active" : ""} onClick={() => { if (mode === "notes") setSelected(index); else setChordInput(item.symbol); }}>
-                  <strong>{item.symbol}</strong><span>{chordTypeLabel(item.type, item.symbol)}</span><small>{item.notes.join(" · ")}</small>
-                </button>
-              ))}
-            </div>
-          </section>
-        </div>
-      </div>
-    </section>
+    <div
+      ref={root}
+      className="app"
+      tabIndex={-1}
+      onMouseOver={(event) => {
+        const element = (event.target as Element).closest("[data-pc]");
+        const pc = element ? Number(element.getAttribute("data-pc")) : null;
+        setHotPc(pc !== null && analysis.info.has(pc) ? pc : null);
+      }}
+      onMouseLeave={() => setHotPc(null)}
+      onClick={(event) => {
+        // Return keyboard focus to the workspace after pointer clicks so Space and the arrows keep working.
+        const element = event.target as HTMLElement;
+        if (event.detail > 0 && !element.closest("input, .dd")) focusWorkspace();
+      }}
+    >
+      <Toolbar
+        searchRef={search}
+        currentRoot={chord?.rootName ?? null}
+        recents={lab.recents}
+        spelling={lab.spelling}
+        sound={lab.sound}
+        canUndo={lab.canUndo}
+        canRedo={lab.canRedo}
+        onUndo={lab.undo}
+        onRedo={lab.redo}
+        onSpelling={lab.setSpelling}
+        onSound={lab.setSound}
+        onPreview={lab.previewChord}
+        onCommit={lab.applyChord}
+        onKeepPreview={lab.commitPreview}
+        onSearchDone={focusWorkspace}
+      />
+      <main className="body">
+        <ChordHero
+          analysis={analysis}
+          hotPc={hotPc}
+          onPlay={lab.play}
+          onCopy={() => chord && copy(`${prettyAccidentals(chord.symbol)}: ${chord.notes.map(prettyAccidentals).join(" ")}`)}
+          onTone={lab.playPitchClass}
+          onName={lab.chooseName}
+          onPick={(symbol) => { const picked = parseChordSymbol(symbol); if (picked) lab.applyChord(picked); }}
+        />
+        <GuitarPanel
+          analysis={analysis}
+          voicings={voicings}
+          index={voicingIndex}
+          labels={lab.labels}
+          editing={editing}
+          hotPc={hotPc}
+          onIndex={lab.setVoicingIndex}
+          onLabels={lab.setLabels}
+          onEdit={lab.startEditing}
+          onDone={() => lab.setEditing(false)}
+          onCell={lab.placeFinger}
+          onTop={lab.toggleOpen}
+          onShift={lab.shiftShape}
+          onCopyTab={copy}
+        />
+        <PianoKeys analysis={analysis} spelling={lab.spelling} hotPc={hotPc} onKey={lab.toggleKey} onTranspose={lab.transpose} onClear={lab.clear} />
+      </main>
+      <div className={`toast${toast ? " show" : ""}`} role="status" aria-live="polite">{toast}</div>
+    </div>
   );
 }
