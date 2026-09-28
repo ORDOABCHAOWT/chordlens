@@ -38,7 +38,7 @@ export function GuitarPanel(props: GuitarPanelProps) {
   useEffect(() => {
     const row = thumbs.current;
     const selected = row?.querySelector<HTMLElement>('[aria-pressed="true"]');
-    if (row && selected) row.scrollTo({ left: Math.max(0, selected.offsetLeft - row.clientWidth / 2 + selected.clientWidth / 2), behavior: "smooth" });
+    if (row && selected) row.scrollTo({ top: Math.max(0, selected.offsetTop - row.clientHeight / 2 + selected.clientHeight / 2), behavior: "smooth" });
   }, [index, voicings]);
 
   const head = (
@@ -56,7 +56,7 @@ export function GuitarPanel(props: GuitarPanelProps) {
 
   if (editing) {
     return (
-      <section className="gtr" aria-label={T.guitar}>
+      <section className="gtr single" aria-label={T.guitar}>
         {head}
         <div className="dg-wrap">
           <button type="button" className="nav" aria-label={T.shiftDown} onClick={() => props.onShift(-1)}><ChevronLeft className="ic" /></button>
@@ -70,7 +70,7 @@ export function GuitarPanel(props: GuitarPanelProps) {
 
   if (!voicing) {
     return (
-      <section className="gtr" aria-label={T.guitar}>
+      <section className="gtr single" aria-label={T.guitar}>
         {head}
         <div className="dg-wrap"><span /><div className="dg-box"><GuitarDiagram voicing={null} info={analysis.info} /></div><span /></div>
         <p className="g-empty">{analysis.chord ? T.noVoicing : T.noChordForGuitar}</p>
@@ -80,7 +80,7 @@ export function GuitarPanel(props: GuitarPanelProps) {
 
   const level = voicing.difficulty <= 7 ? 0 : voicing.difficulty <= 10 ? 1 : 2;
   return (
-    <section className="gtr" aria-label={T.guitar}>
+    <section className={`gtr${voicings.length > 1 ? "" : " single"}`} aria-label={T.guitar}>
       {head}
       <div className="dg-wrap">
         <button type="button" className="nav" aria-label={T.previousVoicing} disabled={index === 0} onClick={() => props.onIndex(index - 1)}><ChevronLeft className="ic" /></button>

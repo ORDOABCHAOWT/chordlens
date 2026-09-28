@@ -99,12 +99,14 @@ export function ChordLabWindow() {
       <main className="body">
         <ChordHero
           analysis={analysis}
+          spelling={lab.spelling}
           hotPc={hotPc}
           onPlay={lab.play}
           onCopy={() => chord && copy(`${prettyAccidentals(chord.symbol)}: ${chord.notes.map(prettyAccidentals).join(" ")}`)}
           onTone={lab.playPitchClass}
           onName={lab.chooseName}
           onPick={(symbol) => { const picked = parseChordSymbol(symbol); if (picked) lab.applyChord(picked); }}
+          onReset={lab.clear}
         />
         <GuitarPanel
           analysis={analysis}

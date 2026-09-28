@@ -43,7 +43,7 @@ test("keys name the chord, the lowest key is the bass, and history can be undone
   await expect(symbol(page)).toHaveText("从这里开始");
   for (const name of ["E3", "G3", "C4"]) await key(page, name).click();
   await expect(symbol(page)).toHaveAttribute("aria-label", "C/E");
-  await expect(page.locator(".meta")).toContainText("第一转位");
+  await expect(page.locator(".explain")).toContainText("第一转位（低音 E 是三音）");
   await page.getByRole("button", { name: "撤销" }).click();
   await expect(page.locator(".name-main")).toHaveText("小三度");
   await page.getByRole("button", { name: "重做" }).click();
@@ -85,4 +85,32 @@ test("everything fits the minimum native window without scrolling", async ({ pag
   expect(height).toBeLessThanOrEqual(650);
   const [diagram, meta] = await Promise.all([page.locator(".dg-lg").boundingBox(), page.locator(".v-meta").boundingBox()]);
   expect(diagram!.y + diagram!.height).toBeLessThanOrEqual(meta!.y + 1);
+});
+
+test("the reset button above the notes clears every note for a fresh combination", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: /，点击移除$/ })).toHaveCount(4);
+  await page.getByRole("button", { name: "重置" }).click();
+  await expect(symbol(page)).toHaveText("从这里开始");
+  await expect(page.getByRole("button", { name: /，点击移除$/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "重置" })).toHaveCount(0);
+  for (const name of ["D3", "F3", "A3"]) await key(page, name).click();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "Dm");
+  await page.getByRole("button", { name: "撤销" }).click();
+  await page.getByRole("button", { name: "撤销" }).click();
+  await page.getByRole("button", { name: "撤销" }).click();
+  await page.getByRole("button", { name: "撤销" }).click();
+  await expect(symbol(page)).toHaveAttribute("aria-label", "F7");
+});
+
+test("the chord explanation covers construction, sound and usage, and folds usage in the minimum window", async ({ page }) => {
+  await page.goto("/");
+  const explain = page.locator(".explain");
+  await expect(explain).toContainText("大三和弦上再加一个小七度");
+  await expect(explain).toContainText("张力");
+  await expect(explain).toContainText("F7 → B♭");
+  await page.setViewportSize({ width: 900, height: 650 });
+  await expect(page.getByText("F7 → B♭", { exact: false })).toBeHidden();
+  await page.getByRole("button", { name: "展开用法" }).click();
+  await expect(page.getByText("F7 → B♭", { exact: false })).toBeVisible();
 });

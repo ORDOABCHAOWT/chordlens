@@ -1,51 +1,56 @@
-import { Copy, Play } from "lucide-react";
+import { useState } from "react";
+import { Copy, Play, RotateCcw } from "lucide-react";
 import { ChordSymbol } from "../../components/ChordSymbol";
-import { COMMON_PICKS, chordNameZh, chordTypeEnglish, intervalInfo, prettyAccidentals } from "../../music/analysis";
-import type { Analysis, LensChord } from "../../music/analysis";
+import { COMMON_PICKS, chordNameZh, chordTypeEnglish, prettyAccidentals } from "../../music/analysis";
+import type { Analysis, Spelling } from "../../music/analysis";
+import { explainChord } from "../../music/explain";
 import { T } from "./strings";
 
 interface ChordHeroProps {
   analysis: Analysis;
+  spelling: Spelling;
   hotPc: number | null;
   onPlay: () => void;
   onCopy: () => void;
   onTone: (pc: number) => void;
   onName: (symbol: string) => void;
   onPick: (symbol: string) => void;
+  onReset: () => void;
 }
 
-function inversion(chord: LensChord, analysis: Analysis): string {
-  const bass = T.bassOf(prettyAccidentals(chord.bassName));
-  if (!chord.slash) return `${T.inversions[0]} · ${bass}`;
-  const slot = analysis.info.get(chord.bassPc)?.slot;
-  const index = slot === "3" ? 1 : slot === "5" ? 2 : slot === "7" ? 3 : -1;
-  return index > 0 ? `${T.inversions[index]} · ${bass}` : bass;
-}
-
-export function ChordHero({ analysis, hotPc, onPlay, onCopy, onTone, onName, onPick }: ChordHeroProps) {
+export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, onName, onPick, onReset }: ChordHeroProps) {
   const { status, chord, tones, candidates } = analysis;
+  const [usageOpen, setUsageOpen] = useState(false);
   const playButton = (
     <button type="button" className="btn btn-primary" onClick={onPlay}>
       <Play className="ic" fill="currentColor" aria-hidden="true" /><span>{T.play}</span><kbd>{T.space}</kbd>
     </button>
   );
   const toneCards = (
-    <div className="tones" role="group" aria-label={T.formula}>
-      {tones.map((tone) => (
-        <button
-          key={tone.pc}
-          type="button"
-          className={`tone s-${tone.slot}${tone.isRoot ? " is-root" : ""}${hotPc === tone.pc ? " hot" : ""}`}
-          data-pc={tone.pc}
-          aria-label={T.playTone(prettyAccidentals(tone.name), tone.intervalName)}
-          onClick={() => onTone(tone.pc)}
-        >
-          <span className="tone-deg">{tone.degree}</span>
-          <span className="tone-note">{prettyAccidentals(tone.name)}</span>
-          <span className="tone-name">{tone.intervalName}</span>
-          {tone.isBass && tones.length > 1 && <span className="tone-tag">{T.bass}</span>}
+    <div className="notes">
+      <div className="notes-head">
+        <span className="notes-label">{T.chordTones}</span>
+        <button type="button" className="btn btn-quiet btn-reset" title={T.resetHint} onClick={onReset}>
+          <RotateCcw className="ic" aria-hidden="true" /><span>{T.reset}</span>
         </button>
-      ))}
+      </div>
+      <div className="tones" role="group" aria-label={T.chordTones}>
+        {tones.map((tone) => (
+          <button
+            key={tone.pc}
+            type="button"
+            className={`tone s-${tone.slot}${tone.isRoot ? " is-root" : ""}${hotPc === tone.pc ? " hot" : ""}`}
+            data-pc={tone.pc}
+            aria-label={T.playTone(prettyAccidentals(tone.name), tone.intervalName)}
+            onClick={() => onTone(tone.pc)}
+          >
+            <span className="tone-deg">{tone.degree}</span>
+            <span className="tone-note">{prettyAccidentals(tone.name)}</span>
+            <span className="tone-name">{tone.intervalName}</span>
+            {tone.isBass && tones.length > 1 && <span className="tone-tag">{T.bass}</span>}
+          </button>
+        ))}
+      </div>
     </div>
   );
 
@@ -68,11 +73,27 @@ export function ChordHero({ analysis, hotPc, onPlay, onCopy, onTone, onName, onP
 
   if (status === "chord" && chord) {
     const english = chordTypeEnglish(chord);
+    const others = candidates.filter((candidate) => candidate.symbol !== chord.symbol).slice(0, 3);
+    const explanation = explainChord(chord, tones, spelling);
+    const folded = Boolean(explanation.usage || explanation.inversion);
     return (
       <section className="hero" aria-label="当前和弦">
         <div className="hero-top">
-          <h1 className="sym" aria-label={chord.symbol}><ChordSymbol symbol={chord.symbol} /></h1>
-          <p className="name"><span className="name-main">{chordNameZh(chord)}</span>{english && <span className="name-alt">{english}</span>}</p>
+          <h1 className={chord.symbol.length > 7 ? "sym sym-long" : "sym"} aria-label={chord.symbol}><ChordSymbol symbol={chord.symbol} /></h1>
+          <div className="name">
+            <span className="name-main">{chordNameZh(chord)}</span>
+            {english && <span className="name-alt">{english}</span>}
+            {others.length > 0 && (
+              <span className="name-also" role="group" aria-label={T.otherNames}>
+                <span>{T.alsoCalled}</span>
+                {others.map((candidate) => (
+                  <button key={candidate.symbol} type="button" className="chip chip-sm" title={T.switchName(prettyAccidentals(candidate.symbol))} onClick={() => onName(candidate.symbol)}>
+                    <ChordSymbol symbol={candidate.symbol} />
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
           <div className="actions">
             {playButton}
             <button type="button" className="btn" onClick={onCopy}><Copy className="ic" aria-hidden="true" /><span>{T.copy}</span></button>
@@ -80,19 +101,16 @@ export function ChordHero({ analysis, hotPc, onPlay, onCopy, onTone, onName, onP
         </div>
         <div className="hero-bottom">
           {toneCards}
-          <p className="meta">
-            <span>{inversion(chord, analysis)}</span>
-            <span>{T.formula} <b>{chord.intervals.map((interval) => intervalInfo(interval).formula).join(" · ")}</b></span>
-          </p>
-          {candidates.length > 1 && (
-            <div className="alts" role="group" aria-label={T.otherNames}>
-              <span className="alts-label">{T.otherNames}</span>
-              {candidates.slice(0, 5).map((candidate) => (
-                <button key={candidate.symbol} type="button" className="chip" aria-pressed={candidate.symbol === chord.symbol} onClick={() => onName(candidate.symbol)}>
-                  <ChordSymbol symbol={candidate.symbol} />
-                </button>
-              ))}
-            </div>
+          <dl className={`explain${usageOpen ? " open" : ""}`} aria-label={T.explanation}>
+            <div className="ex-row"><dt>{T.explainBuild}</dt><dd>{explanation.build}</dd></div>
+            {explanation.sound && <div className="ex-row"><dt>{T.explainSound}</dt><dd>{explanation.sound}</dd></div>}
+            {explanation.inversion && <div className="ex-row ex-extra"><dt>{T.explainInversion}</dt><dd>{explanation.inversion}</dd></div>}
+            {explanation.usage && <div className="ex-row ex-extra"><dt>{T.explainUsage}</dt><dd>{explanation.usage}</dd></div>}
+          </dl>
+          {folded && (
+            <button type="button" className="ex-toggle" aria-expanded={usageOpen} onClick={() => setUsageOpen((open) => !open)}>
+              {usageOpen ? T.hideUsage : T.showUsage}
+            </button>
           )}
         </div>
       </section>
