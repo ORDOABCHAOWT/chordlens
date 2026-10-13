@@ -30,8 +30,10 @@ export const GuitarDiagram = memo(function GuitarDiagram({ voicing, info, size =
   const x = (string: number) => g.left + string * g.gap;
   const y = (shownFret: number) => g.top + (shownFret - 0.5) * g.fret;
   const widths = large ? [2.1, 1.8, 1.5, 1.2, 1, 0.9] : [1.1, 1, 0.9, 0.8, 0.7, 0.6];
-  const barre = voicing?.barre;
-  const barreShown = barre ? barre.fret - base + 1 : 0;
+  const barres = [voicing?.barre, voicing?.smallBarre].flatMap((barre) => {
+    const shown = barre ? barre.fret - base + 1 : 0;
+    return barre && shown >= 1 && shown <= 4 ? [{ ...barre, shown }] : [];
+  });
   const editable = Boolean(onCell && onTop);
   const label = voicing ? `吉他指法 ${voicing.frets.join(" ")}${base > 1 ? `，第 ${base} 品起` : ""}` : "空白指板";
 
@@ -51,12 +53,12 @@ export const GuitarDiagram = memo(function GuitarDiagram({ voicing, info, size =
           {base}{large && <tspan>fr</tspan>}
         </text>
       )}
-      {barre && barreShown >= 1 && barreShown <= 4 && (() => {
+      {barres.map((barre) => {
         const pad = g.radius + (large ? 3 : 1.2);
         const from = x(barre.fromString - 1);
         const to = x(barre.toString - 1);
-        return <rect className="dg-barre" x={from - pad} y={y(barreShown) - pad} width={to - from + pad * 2} height={pad * 2} rx={pad} />;
-      })()}
+        return <rect key={barre.fret} className="dg-barre" x={from - pad} y={y(barre.shown) - pad} width={to - from + pad * 2} height={pad * 2} rx={pad} />;
+      })}
       {voicing?.frets.map((fret, string) => {
         const cx = x(string);
         if (fret === "x") {

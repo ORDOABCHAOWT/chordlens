@@ -168,12 +168,12 @@ describe("voicings follow the bass", () => {
     expect(first("Am7")).toBe("x 0 2 0 1 0");
     expect(first("Gmaj7")).toBe("3 2 0 0 0 2");
     expect(first("D/A")).toBe("x 0 0 2 3 2");
-    expect(first("F/A")).toBe("x 0 3 2 1 x");
+    expect(first("F/A")).toBe("x 0 3 2 1 1");
   });
 
   it("leaves open strings out of shapes far up the neck", () => {
     expect(first("Dsus4")).toBe("x x 0 2 3 3");
-    expect(first("Eb")).toBe("x 6 8 8 8 x");
-    expect(first("C7sus4")).toBe("x 3 3 3 x 3");
+    expect(first("Eb")).toBe("x 6 8 8 8 6");
+    expect(first("C7sus4")).toBe("x 3 3 3 6 3");
   });
 });

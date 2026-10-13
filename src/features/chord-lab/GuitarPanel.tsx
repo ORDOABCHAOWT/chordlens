@@ -27,7 +27,7 @@ interface GuitarPanelProps {
 function position(voicing: GuitarVoicing) {
   if (voicing.custom) return T.customShape;
   const start = voicing.baseFret === 1 ? (voicing.frets.some((fret) => fret === 0) ? T.openPosition : T.fromFret(1)) : T.fromFret(voicing.baseFret);
-  return voicing.barre ? `${start} · ${T.barre}` : start;
+  return voicing.barre || voicing.smallBarre ? `${start} · ${T.barre}` : start;
 }
 
 export function GuitarPanel(props: GuitarPanelProps) {
@@ -78,7 +78,9 @@ export function GuitarPanel(props: GuitarPanelProps) {
     );
   }
 
-  const level = voicing.difficulty <= 7 ? 0 : voicing.difficulty <= 10 ? 1 : 2;
+  const level = voicing.difficulty <= 5.5 ? 0 : voicing.difficulty <= 8.8 ? 1 : 2;
+  // Only a shape the user placed can be one no hand holds.
+  const difficulty = voicing.fingers ? T.difficulty[level] : T.outOfReach;
   return (
     <section className={`gtr${voicings.length > 1 ? "" : " single"}`} aria-label={T.guitar}>
       {head}
@@ -90,9 +92,9 @@ export function GuitarPanel(props: GuitarPanelProps) {
       <div className="v-meta">
         <span className="v-count">{index + 1} / {voicings.length}</span>
         <span>{position(voicing)}</span>
-        <span className="v-diff" title={T.difficulty[level]}>
+        <span className="v-diff" title={difficulty}>
           {[0, 1, 2].map((step) => <i key={step} className={step <= level ? "on" : ""} />)}
-          <span>{T.difficulty[level]}</span>
+          <span>{difficulty}</span>
         </span>
         <button type="button" className="tab" title={T.copy} onClick={() => props.onCopyTab(tabText(voicing, true))}>
           {tabText(voicing)}<Copy className="ic" aria-hidden="true" />

@@ -76,8 +76,10 @@ describe("guitar voicings", () => {
     const bb = generateVoicings("Bb", ["B♭", "D", "F"])[0];
     expect(bb?.frets).toEqual(["x", 1, 3, 3, 3, 1]);
     expect(bb?.barre).toEqual({ fret: 1, fromString: 2, toString: 6 });
+    expect(bb?.smallBarre).toEqual({ fret: 3, fromString: 3, toString: 5 });
 
     const asus2 = generateVoicings("Asus2", ["A", "B", "E"])[0];
     expect(asus2?.barre).toBeUndefined();
+    expect(asus2?.smallBarre).toBeUndefined();
   });
 });
