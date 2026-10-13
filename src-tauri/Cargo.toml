@@ -1,8 +1,9 @@
 [package]
 name = "chordlens"
 version = "0.1.0"
-description = "Local-first music transcription and chord analysis for macOS"
+description = "A local macOS chord tool: chord names, keys and guitar shapes in sync"
 authors = ["ChordLens"]
+license = "MIT"
 edition = "2021"
 
 [lib]
