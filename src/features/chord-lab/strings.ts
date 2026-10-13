@@ -54,6 +54,7 @@ export const T = {
   fromFret: (fret: number) => `第 ${fret} 品起`,
   barre: "横按",
   difficulty: ["容易", "适中", "较难"],
+  outOfReach: "手按不到",
   noVoicing: "4 品之内没有能完整弹出这个和弦的指法。",
   noChordForGuitar: "有和弦后这里显示指法。也可以点右上角的笔，在指板上摆出指型反查和弦。",
   keys: "琴键",

@@ -30,4 +30,14 @@ The window uses the macOS overlay title bar: the toolbar is the drag region (`da
 
 ## Guitar diagrams
 
-Strings run from low E at the left to high E at the right. × means muted, ○ means open. Asus2 defaults to the standard `x02200` shape. Generated positions are checked for complete chord-tone coverage and all pressed frets fit within the four displayed spaces. The lowest note of a shape is the chord's bass: the root, or the note after the slash, whenever such shapes exist. Lower positions are preferred, and shapes with a muted string inside them or with open strings under a hand far up the neck rank last. Suggested shapes are heuristics, not a guarantee of comfortable fingering for every player.
+Strings run from low E at the left to high E at the right. × means muted, ○ means open, and a bar behind the dots is a barre. Every shape contains each chord tone, fits within the four displayed frets and has the chord's bass as its lowest note: the root, or the note after the slash, whenever such shapes exist.
+
+Only shapes a hand can hold are offered. The rules live in `src/music/fingering.ts`:
+
+- Four fingers, one fret each from the lowest fret up. The middle and ring fingers may reach one fret further; the thumb is never used.
+- The index finger may lie across the lowest fret, as long as no string under it has to ring open.
+- The ring or little finger may flatten over the last strings of the highest fret, as in C9 (`x32333`) or the B♭ barre chord (`x13331`).
+- A muted string inside a shape has to sit next to the bass note, whose finger damps it, as in Fmaj7 (`1x221x`).
+- Open strings belong to the first three frets; further up the neck only the bass string is left open.
+
+The same rules give the difficulty (容易 / 适中 / 较难). A list starts with the grip most players learn first, open chords and then barre chords, and leaves out a grip that only repeats another with strings left out. The hardest shapes are kept for the standard barre chords. A shape you place yourself is always shown, and marked 手按不到 when no fingering exists for it. The order is a heuristic: how comfortable a shape is still depends on the hand.
