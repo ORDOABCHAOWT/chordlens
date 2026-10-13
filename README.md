@@ -41,3 +41,7 @@ Only shapes a hand can hold are offered. The rules live in `src/music/fingering.
 - Open strings belong to the first three frets; further up the neck only the bass string is left open.
 
 The same rules give the difficulty (容易 / 适中 / 较难). A list starts with the grip most players learn first, open chords and then barre chords, and leaves out a grip that only repeats another with strings left out. The hardest shapes are kept for the standard barre chords. A shape you place yourself is always shown, and marked 手按不到 when no fingering exists for it. The order is a heuristic: how comfortable a shape is still depends on the hand.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The libraries ChordLens is built on are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
