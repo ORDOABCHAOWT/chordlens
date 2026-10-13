@@ -3,8 +3,9 @@ import { Copy, Play, RotateCcw } from "lucide-react";
 import { ChordSymbol } from "../../components/ChordSymbol";
 import { COMMON_PICKS, chordNameZh, chordTypeEnglish, prettyAccidentals } from "../../music/analysis";
 import type { Analysis, Spelling } from "../../music/analysis";
-import { explainChord } from "../../music/explain";
+import { explainChord, inversionName } from "../../music/explain";
 import { T } from "./strings";
+import { ToneCards } from "./ToneCards";
 
 interface ChordHeroProps {
   analysis: Analysis;
@@ -16,9 +17,11 @@ interface ChordHeroProps {
   onName: (symbol: string) => void;
   onPick: (symbol: string) => void;
   onReset: () => void;
+  onRootPreview: (pc: number | null) => void;
+  onRoot: (pc: number) => void;
 }
 
-export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, onName, onPick, onReset }: ChordHeroProps) {
+export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, onName, onPick, onReset, onRootPreview, onRoot }: ChordHeroProps) {
   const { status, chord, tones, candidates } = analysis;
   const [usageOpen, setUsageOpen] = useState(false);
   const playButton = (
@@ -29,28 +32,15 @@ export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, o
   const toneCards = (
     <div className="notes">
       <div className="notes-head">
-        <span className="notes-label">{T.chordTones}</span>
+        <span className="notes-lead">
+          <span className="notes-label">{T.chordTones}</span>
+          {tones.length > 1 && <span className="notes-hint">{T.tonesHint}</span>}
+        </span>
         <button type="button" className="btn btn-quiet btn-reset" title={T.resetHint} onClick={onReset}>
           <RotateCcw className="ic" aria-hidden="true" /><span>{T.reset}</span>
         </button>
       </div>
-      <div className="tones" role="group" aria-label={T.chordTones}>
-        {tones.map((tone) => (
-          <button
-            key={tone.pc}
-            type="button"
-            className={`tone s-${tone.slot}${tone.isRoot ? " is-root" : ""}${hotPc === tone.pc ? " hot" : ""}`}
-            data-pc={tone.pc}
-            aria-label={T.playTone(prettyAccidentals(tone.name), tone.intervalName)}
-            onClick={() => onTone(tone.pc)}
-          >
-            <span className="tone-deg">{tone.degree}</span>
-            <span className="tone-note">{prettyAccidentals(tone.name)}</span>
-            <span className="tone-name">{tone.intervalName}</span>
-            {tone.isBass && tones.length > 1 && <span className="tone-tag">{T.bass}</span>}
-          </button>
-        ))}
-      </div>
+      <ToneCards tones={tones} hotPc={hotPc} onTone={onTone} onRootPreview={onRootPreview} onRoot={onRoot} />
     </div>
   );
 
@@ -73,6 +63,7 @@ export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, o
 
   if (status === "chord" && chord) {
     const english = chordTypeEnglish(chord);
+    const inversion = inversionName(chord, tones);
     const others = candidates.filter((candidate) => candidate.symbol !== chord.symbol).slice(0, 3);
     const explanation = explainChord(chord, tones, spelling);
     const folded = Boolean(explanation.usage || explanation.inversion);
@@ -81,11 +72,16 @@ export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, o
         <div className="hero-top">
           <h1 className={chord.symbol.length > 7 ? "sym sym-long" : "sym"} aria-label={chord.symbol}><ChordSymbol symbol={chord.symbol} /></h1>
           <div className="name">
-            <span className="name-main">{chordNameZh(chord)}</span>
-            {english && <span className="name-alt">{english}</span>}
+            <span className="name-main">{chord.rare ? T.rootedOn(prettyAccidentals(chord.rootName)) : chordNameZh(chord)}</span>
+            {chord.rare ? <span className="name-alt">{T.rareName}</span> : english && <span className="name-alt">{english}</span>}
+            {chord.slash && (
+              <span className="name-bass">
+                {inversion}<span className={inversion ? "name-bass-note" : undefined}>{inversion && " · "}{T.bassOf(prettyAccidentals(chord.bassName))}</span>
+              </span>
+            )}
             {others.length > 0 && (
               <span className="name-also" role="group" aria-label={T.otherNames}>
-                <span>{T.alsoCalled}</span>
+                <span>{chord.rare ? T.moreCommon : T.alsoCalled}</span>
                 {others.map((candidate) => (
                   <button key={candidate.symbol} type="button" className="chip chip-sm" title={T.switchName(prettyAccidentals(candidate.symbol))} onClick={() => onName(candidate.symbol)}>
                     <ChordSymbol symbol={candidate.symbol} />
@@ -118,6 +114,8 @@ export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, o
   }
 
   const [first, second] = tones;
+  // The notes may still be a chord on another root: the user's choice of root is what left them unnamed.
+  const usual = candidates.slice(0, 3);
   return (
     <section className="hero" aria-label="当前和弦">
       <div className="hero-top">
@@ -128,7 +126,24 @@ export function ChordHero({ analysis, spelling, hotPc, onPlay, onCopy, onTone, o
             <p className="name"><span className="name-main">{second.intervalName}</span><span className="name-alt">{T.interval}</span></p>
           </>
         )}
-        {status === "unknown" && <><h1 className="sym sym-sm">{T.unknown}</h1><p className="lede">{T.unknownHint}</p></>}
+        {status === "unknown" && (
+          <>
+            <h1 className="sym sym-sm">{T.unknown}</h1>
+            {usual.length > 0 ? (
+              <p className="name">
+                <span className="name-alt">{T.unknownOnRoot(prettyAccidentals(first.name))}</span>
+                <span className="name-also" role="group" aria-label={T.otherNames}>
+                  <span>{T.moreCommon}</span>
+                  {usual.map((candidate) => (
+                    <button key={candidate.symbol} type="button" className="chip chip-sm" title={T.switchName(prettyAccidentals(candidate.symbol))} onClick={() => onName(candidate.symbol)}>
+                      <ChordSymbol symbol={candidate.symbol} />
+                    </button>
+                  ))}
+                </span>
+              </p>
+            ) : <p className="lede">{T.unknownHint}</p>}
+          </>
+        )}
         <div className="actions">{playButton}</div>
       </div>
       <div className="hero-bottom">{toneCards}</div>

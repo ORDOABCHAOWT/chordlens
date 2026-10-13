@@ -49,11 +49,11 @@ function difficulty(frets: Array<number | "x">) {
   const max = pressed.length ? Math.max(...pressed) : 0;
   const span = max - min;
   const muted = frets.filter((value) => value === "x").length;
-  // A mute between two sounding groups is awkward to execute and makes a
-  // voicing much less useful than the same number of edge mutes.
+  // A mute between two sounding groups is awkward to execute: it costs more
+  // than fretting that string would, and far more than an edge mute.
   const mutedInsideShape = internalMutes(frets);
   const barreBonus = new Set(pressed).size < pressed.length ? -0.5 : 0;
-  return Math.round((pressed.length + span * 1.7 + muted * 0.35 + mutedInsideShape * 1.4 + barreBonus) * 10) / 10;
+  return Math.round((pressed.length + span * 1.7 + muted * 0.35 + mutedInsideShape * 3 + barreBonus) * 10) / 10;
 }
 
 function inferBarre(frets: Array<number | "x">): GuitarVoicing["barre"] {
@@ -94,7 +94,7 @@ export function toVoicing(frets: Array<number | "x">): GuitarVoicing {
 }
 
 export interface VoicingOptions {
-  /** Pitch class that should sound lowest; defaults to the root. Slash chords keep only shapes with this bass when any exist. */
+  /** Pitch class that should sound lowest; defaults to the root. Only shapes with this bass are kept when any exist. */
   bassPc?: number;
 }
 
@@ -105,6 +105,12 @@ export function tabText(voicing: GuitarVoicing, compact = false): string {
 
 export function soundingMidis(frets: Array<number | "x">): number[] {
   return frets.flatMap((fret, index) => fret === "x" ? [] : [STANDARD_TUNING[index] + fret]);
+}
+
+/** The bass is the lowest pitch, which an open string can take from a lower string fretted far up the neck. */
+function bassPitchClass(frets: Array<number | "x">): number {
+  const midis = soundingMidis(frets);
+  return midis.length ? Math.min(...midis) % 12 : -1;
 }
 
 export function generateVoicings(symbol: string, chordNotes: string[], limit = 12, settings: VoicingOptions = {}): GuitarVoicing[] {
@@ -121,13 +127,14 @@ export function generateVoicings(symbol: string, chordNotes: string[], limit = 1
     .filter((frets) => hasExactTargetCoverage(frets, target) && fitsDiagram(frets))
     .map(toVoicing);
   const seen = new Set(results.map((voicing) => voicing.frets.join(",")));
-  // Lower positions read and play more easily; the wanted bass on the lowest string matters more for slash chords.
+  // Lower positions read and play more easily, open strings sit oddly under a hand far up the neck,
+  // and the wanted bass has to be the lowest note.
   const preference = (frets: Array<number | "x">) => {
     const pressed = frets.filter((value): value is number => typeof value === "number" && value > 0);
-    const position = pressed.length ? Math.max(0, Math.min(...pressed) - 1) * 0.3 : 0;
-    const lowest = frets.findIndex((fret) => fret !== "x");
-    const bassMatches = lowest >= 0 && typeof frets[lowest] === "number" && (STANDARD_TUNING[lowest] + frets[lowest]) % 12 === bass;
-    return position + (bassMatches ? (slash ? -4 : -2) : 0);
+    const lowestPressed = pressed.length ? Math.min(...pressed) : 0;
+    const position = Math.max(0, lowestPressed - 1) * 0.3;
+    const strayOpen = frets.filter((fret) => fret === 0).length * Math.max(0, lowestPressed - 3);
+    return position + strayOpen + (bassPitchClass(frets) === bass ? -4 : 0);
   };
   const options = STANDARD_TUNING.map((openMidi) => {
     const matches: Array<number | "x"> = ["x"];
@@ -181,10 +188,9 @@ export function generateVoicings(symbol: string, chordNotes: string[], limit = 1
   results.push(...generated.map((candidate) => toVoicing(candidate.frets)));
 
   let playable = results.filter((voicing) => hasExactTargetCoverage(voicing.frets, target) && fitsDiagram(voicing.frets));
-  if (slash) {
-    const withBass = playable.filter((voicing) => pitchClass(voicing.notes[0] ?? "") === bass);
-    if (withBass.length) playable = withBass;
-  }
+  // The lowest note is the bass, so a shape with another note there plays a different (slash) chord.
+  const withBass = playable.filter((voicing) => bassPitchClass(voicing.frets) === bass);
+  if (withBass.length) playable = withBass;
   return playable
     .sort((a, b) => {
       const aPreferred = preferredOrder.get(a.frets.join(","));

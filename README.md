@@ -3,7 +3,8 @@
 ChordLens is a local macOS chord tool with a Chinese interface. One workspace keeps three views of the same chord in sync: the chord name, a two-octave keyboard and standard-tuning guitar shapes. Change any of them and the other two follow.
 
 - **Type a chord** in the toolbar field (or just start typing A–G). Suggestions complete the name, accept slash chords such as `G/B`, and a bare quality such as `m7` applies to the current root. `esc` restores the chord that was showing before.
-- **Click keys** to add or remove notes. The lowest key is the bass, so inversions are named as slash chords (E–G–C → C/E, first inversion).
+- **Click keys** to add or remove notes. The first key you press is the root and the lowest key is the bass: C, then E and G below it, reads C/E (first inversion). Notes that are no chord on that root get a rule name such as A6sus4(no5), with the usual name (D/A) one click away under 更常见.
+- **Drag a tone card to the front** to make that note the root. The name, the guitar shapes and the explanation preview the result while the card is held there; `esc` cancels.
 - **Browse guitar shapes** with ← → or the thumbnails; each shows its position, barre and difficulty, and the TAB can be copied. Use the pencil to place a shape on the fretboard and name it.
 - Tones are coloured by function (root, third or sus, fifth, sixth/seventh, tension) in the name, on the keys and on the fretboard; roots are also drawn square.
 - Space plays the current shape (a local plucked-string synth), keys sound when added, `[` `]` transpose, and ⌘Z / ⇧⌘Z undo and redo. The keyboard icon in the toolbar lists every shortcut.
@@ -29,4 +30,4 @@ The window uses the macOS overlay title bar: the toolbar is the drag region (`da
 
 ## Guitar diagrams
 
-Strings run from low E at the left to high E at the right. × means muted, ○ means open. Asus2 defaults to the standard `x02200` shape. Generated positions are checked for complete chord-tone coverage and all pressed frets fit within the four displayed spaces; lower positions are preferred, and slash chords keep only shapes whose lowest string plays the requested bass when such shapes exist. Suggested shapes are heuristics, not a guarantee of comfortable fingering for every player.
+Strings run from low E at the left to high E at the right. × means muted, ○ means open. Asus2 defaults to the standard `x02200` shape. Generated positions are checked for complete chord-tone coverage and all pressed frets fit within the four displayed spaces. The lowest note of a shape is the chord's bass: the root, or the note after the slash, whenever such shapes exist. Lower positions are preferred, and shapes with a muted string inside them or with open strings under a hand far up the neck rank last. Suggested shapes are heuristics, not a guarantee of comfortable fingering for every player.

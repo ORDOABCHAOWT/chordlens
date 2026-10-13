@@ -145,6 +145,15 @@ const USAGE: Record<string, (c: Context) => string> = {
   "7no5": (c) => `和 ${c.root}7 用法相同，通常解决到 ${c.at(5)}。`,
 };
 
+const INVERSIONS: Record<number, string> = { 3: "第一转位", 5: "第二转位", 7: "第三转位" };
+
+/** "第二转位" when the third, fifth or seventh is in the bass; empty for the root or any other bass. */
+export function inversionName(chord: LensChord, tones: Tone[]): string {
+  if (!chord.slash || !chord.pcs.includes(chord.bassPc)) return "";
+  const tone = tones.find((item) => item.pc === chord.bassPc);
+  return tone ? INVERSIONS[Number(tone.degree.replace(/\D/g, ""))] ?? "" : "";
+}
+
 function inversionNote(chord: LensChord, tones: Tone[], c: Context): string | undefined {
   if (!chord.slash) return undefined;
   const bass = prettyAccidentals(chord.bassName);
