@@ -13,18 +13,26 @@ export function ChordLabWindow() {
   const root = useRef<HTMLDivElement>(null);
   const search = useRef<ChordSearchHandle>(null);
   const [hotPc, setHotPc] = useState<number | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; ms: number } | null>(null);
   const { analysis, voicings, voicingIndex, editing } = lab;
 
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 1600);
+    const timer = window.setTimeout(() => setToast(null), toast.ms);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
   const copy = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).then(() => setToast(`${T.copied}  ${text}`), () => setToast(T.copyFailed));
+    navigator.clipboard.writeText(text).then(() => setToast({ text: `${T.copied}  ${text}`, ms: 1600 }), () => setToast({ text: T.copyFailed, ms: 1600 }));
   }, []);
+
+  // Says what the drop did: a root the notes do not usually have gets a rule name, and the usual one is worth knowing.
+  const moveRoot = (pc: number) => {
+    const move = lab.setRoot(pc);
+    const root = prettyAccidentals(move.root);
+    const text = move.rare ? T.rootRare(root, prettyAccidentals(move.common)) : move.symbol ? T.rootMoved(root, prettyAccidentals(move.symbol)) : T.rootOnly(root);
+    setToast({ text, ms: 2600 });
+  };
 
   const focusWorkspace = useCallback(() => root.current?.focus({ preventScroll: true }), []);
 
@@ -107,6 +115,8 @@ export function ChordLabWindow() {
           onName={lab.chooseName}
           onPick={(symbol) => { const picked = parseChordSymbol(symbol); if (picked) lab.applyChord(picked); }}
           onReset={lab.clear}
+          onRootPreview={lab.previewRoot}
+          onRoot={moveRoot}
         />
         <GuitarPanel
           analysis={analysis}
@@ -126,7 +136,7 @@ export function ChordLabWindow() {
         />
         <PianoKeys analysis={analysis} spelling={lab.spelling} hotPc={hotPc} onKey={lab.toggleKey} onTranspose={lab.transpose} onClear={lab.clear} />
       </main>
-      <div className={`toast${toast ? " show" : ""}`} role="status" aria-live="polite">{toast}</div>
+      <div className={`toast${toast ? " show" : ""}`} role="status" aria-live="polite">{toast?.text}</div>
     </div>
   );
 }

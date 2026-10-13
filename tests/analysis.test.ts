@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyze, detectChords, intervalInfo, keysForChord, parseChordSymbol, respell, suggestChords } from "../src/music/analysis";
+import { analyze, detectChords, intervalInfo, keysForChord, keysOverRoot, parseChordSymbol, respell, suggestChords } from "../src/music/analysis";
 import { generateVoicings, soundingMidis } from "../src/music/voicings";
 
 describe("chord symbols", () => {
@@ -48,6 +48,63 @@ describe("naming keys", () => {
   });
 });
 
+describe("a root the user chooses", () => {
+  it("reads the notes on that root when the library has a chord there", () => {
+    const keys = [57, 60, 64, 67];
+    expect(analyze(keys, null, "auto").chord?.symbol).toBe("Am7");
+    expect(analyze(keys, null, "auto", 9).chord?.symbol).toBe("Am7");
+    expect(analyze(keys, null, "auto", 0).chord?.symbol).toBe("C6/A");
+    expect(analyze([48, 52, 55, 57], null, "auto", 9).chord?.symbol).toBe("Am7/C");
+    expect(analyze([52, 55, 60], null, "auto", 0).chord?.symbol).toBe("C/E");
+    expect(analyze([52, 55, 60], null, "auto", 4).chord?.symbol).toBe("Em#5");
+  });
+
+  it("names by rule what the library cannot name on that root, and keeps the usual names at hand", () => {
+    const view = analyze([57, 62, 66], null, "auto", 9);
+    expect(view.chord?.symbol).toBe("A6sus4(no5)");
+    expect(view.chord?.rare).toBe(true);
+    expect(view.tones.map((tone) => `${tone.degree} ${tone.name} ${tone.intervalName}`)).toEqual(["R A 根音", "4 D 纯四度", "6 F# 大六度"]);
+    expect(view.tones[0]).toMatchObject({ isRoot: true, isBass: true });
+    expect(view.candidates.map((chord) => chord.symbol)).toEqual(["D/A", "F#m#5/A"]);
+    expect(analyze([50, 54, 57], null, "auto", 9).chord?.symbol).toBe("A6sus4(no5)/D");
+    expect(analyze([57, 62, 66], null, "flat", 9).chord?.notes).toEqual(["A", "D", "Gb"]);
+  });
+
+  it.each([
+    [[60, 64, 69], "C6(no5)"],
+    [[60, 67, 70], "C7(no3)"],
+    [[60, 65, 70], "C7sus4(no5)"],
+    [[60, 64, 71], "Cmaj7(no5)"],
+    [[60, 63, 70], "Cm7(no5)"],
+    [[60, 63, 71], "CmMaj7(no5)"],
+    [[60, 62, 64], "Cadd9(no5)"],
+    [[60, 64, 65, 67], "Cadd4"],
+    [[60, 65, 67, 69], "C6sus4"],
+    [[60, 62, 67, 69], "C6sus2"],
+  ])("builds a rule name for %j", (keys, symbol) => {
+    expect(analyze(keys, null, "auto", 0).chord?.symbol).toBe(symbol);
+  });
+
+  it("measures intervals from the chosen root when there is no chord to name", () => {
+    const pair = analyze([57, 62], null, "auto", 9);
+    expect(pair.status).toBe("interval");
+    expect(pair.tones.map((tone) => tone.name)).toEqual(["A", "D"]);
+    expect(pair.tones[1].intervalName).toBe("纯四度");
+    expect(analyze([57, 62], null, "auto").chord?.symbol).toBe("D5/A");
+
+    const cluster = analyze([60, 61, 62], null, "auto", 2);
+    expect(cluster.status).toBe("unknown");
+    expect(cluster.tones.map((tone) => `${tone.degree} ${tone.name}`)).toEqual(["R D", "♭7 C", "7 Db"]);
+    expect(cluster.tones.find((tone) => tone.isBass)?.name).toBe("C");
+  });
+
+  it("puts a chosen root at the bottom, voiced the way a typed chord is", () => {
+    expect(keysOverRoot([50, 54, 57], 9)).toEqual([57, 62, 66]);
+    expect(keysOverRoot([48, 52, 55, 57], 9)).toEqual(keysForChord(parseChordSymbol("Am7")!));
+    expect(keysOverRoot([50, 54, 57], 0)).toEqual([50, 54, 57]);
+  });
+});
+
 describe("display", () => {
   it("writes degrees the way musicians read them", () => {
     expect(["1P", "3m", "5d", "7m", "7d", "9A", "11A", "13m"].map((interval) => intervalInfo(interval).degree)).toEqual(["R", "♭3", "♭5", "♭7", "♭♭7", "♯9", "♯11", "♭13"]);
@@ -83,5 +140,40 @@ describe("slash chord voicings", () => {
   it("prefers the open shape for C/E over a high position", () => {
     const [first] = generateVoicings("C/E", ["C", "E", "G"], 4, { bassPc: 4 });
     expect(Math.max(...first.frets.filter((fret): fret is number => typeof fret === "number"))).toBeLessThanOrEqual(5);
+  });
+});
+
+describe("voicings follow the bass", () => {
+  const shapes = (symbol: string) => {
+    const chord = parseChordSymbol(symbol)!;
+    return generateVoicings(chord.symbol, chord.notes, 12, { bassPc: chord.bassPc });
+  };
+  const first = (symbol: string) => shapes(symbol)[0]?.frets.join(" ");
+
+  it("keeps the root on the lowest sounding string when the chord has no slash", () => {
+    ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"].forEach((root) => {
+      ["", "m", "7", "maj7", "m7", "sus2", "sus4", "6", "dim", "aug", "9", "add9"].forEach((suffix) => {
+        const chord = parseChordSymbol(root + suffix)!;
+        const voicings = shapes(root + suffix);
+        expect(voicings.length).toBeGreaterThan(0);
+        voicings.forEach((voicing) => expect(Math.min(...soundingMidis(voicing.frets)) % 12, `${chord.symbol}: ${voicing.frets.join(" ")}`).toBe(chord.rootPc));
+      });
+    });
+  });
+
+  it("starts with the everyday shape", () => {
+    expect(first("C")).toBe("x 3 2 0 1 0");
+    expect(first("D")).toBe("x x 0 2 3 2");
+    expect(first("E7")).toBe("0 2 0 1 0 0");
+    expect(first("Am7")).toBe("x 0 2 0 1 0");
+    expect(first("Gmaj7")).toBe("3 2 0 0 0 2");
+    expect(first("D/A")).toBe("x 0 0 2 3 2");
+    expect(first("F/A")).toBe("x 0 3 2 1 x");
+  });
+
+  it("leaves open strings out of shapes far up the neck", () => {
+    expect(first("Dsus4")).toBe("x x 0 2 3 3");
+    expect(first("Eb")).toBe("x 6 8 8 8 x");
+    expect(first("C7sus4")).toBe("x 3 3 3 x 3");
   });
 });

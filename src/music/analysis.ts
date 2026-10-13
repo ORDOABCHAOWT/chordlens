@@ -18,6 +18,8 @@ export interface LensChord {
   bassPc: number;
   slash: boolean;
   score?: number;
+  /** Named by rule on a root the user chose, because the chord library has no chord there for these notes. */
+  rare?: boolean;
 }
 
 export interface Tone {
@@ -57,7 +59,7 @@ const COMMON_SUFFIXES = ["", "m", "7", "maj7", "m7", "sus4", "sus2", "add9", "6"
 
 export const CHORD_NAMES_ZH: Record<string, string> = {
   "": "大三和弦", m: "小三和弦", "7": "属七和弦", maj7: "大七和弦", m7: "小七和弦", m7b5: "半减七和弦",
-  dim: "减三和弦", dim7: "减七和弦", aug: "增三和弦", sus4: "挂四和弦", sus2: "挂二和弦", "7sus4": "属七挂四和弦",
+  dim: "减三和弦", dim7: "减七和弦", aug: "增三和弦", "m#5": "小三升五和弦", sus4: "挂四和弦", sus2: "挂二和弦", "7sus4": "属七挂四和弦",
   "6": "大六和弦", m6: "小六和弦", "69": "六九和弦", m69: "小六九和弦", "9": "属九和弦", maj9: "大九和弦", m9: "小九和弦",
   add9: "加九和弦", madd9: "小加九和弦", "11": "属十一和弦", m11: "小十一和弦", "13": "属十三和弦", maj13: "大十三和弦",
   m13: "小十三和弦", "7b9": "属七降九和弦", "7#9": "属七升九和弦", "7#11": "属七升十一和弦", "maj7#11": "大七升十一和弦",
@@ -78,6 +80,9 @@ const COMMON_TYPE_BONUS: Record<string, number> = {
   "diminished seventh": 10, augmented: 8, "suspended fourth": 10, "suspended second": 8, sixth: 8, "minor sixth": 8, fifth: 12,
   "dominant ninth": 8, "major ninth": 8, "minor ninth": 8,
 };
+
+/** The plain reading of each distance in semitones, for notes that are not being read as a chord. */
+const SIMPLE_INTERVALS = ["1P", "2m", "2M", "3m", "3M", "4P", "5d", "5P", "6m", "6M", "7m", "7M"];
 
 const unique = <T,>(values: T[]) => [...new Set(values)];
 
@@ -209,7 +214,7 @@ export function detectChords(midis: number[], spelling: Spelling): LensChord[] {
 
 /** Forced sharp or flat display, without double accidentals (as the previous app did). */
 export function respell(chord: LensChord, spelling: Spelling): LensChord {
-  if (spelling === "auto") return chord;
+  if (spelling === "auto" || chord.rare) return chord;
   const names = spelling === "sharp" ? SHARP_NAMES : FLAT_NAMES;
   const next = buildChord(names[chord.rootPc], chord.suffix, chord.slash ? names[chord.bassPc] : null);
   if (!next) return chord;
@@ -257,7 +262,90 @@ export function keysFromPitchClasses(bassPc: number, pcs: number[]): number[] {
 
 export const keysForChord = (chord: LensChord) => keysFromPitchClasses(chord.bassPc, chord.pcs);
 
-export function analyze(midis: number[], override: string | null, spelling: Spelling): Analysis {
+/**
+ * Names for what is left when the user insists on a root the library has no chord on: a triad or a
+ * sixth/seventh chord with its third suspended or a tone left out. Returns null for anything further out.
+ */
+function rareShape(semitones: Set<number>): { suffix: string; intervals: Array<[number, string]> } | null {
+  const has = (value: number) => semitones.has(value);
+  if (has(1) || (has(3) && has(4)) || (has(10) && has(11)) || (has(6) && has(8))) return null;
+  const intervals: Array<[number, string]> = [];
+  let quality = "";
+  let sus = "";
+  let top = "";
+  let fifth = "";
+  let add = "";
+  let omit = "";
+  let spareSecond = has(2);
+  let spareFourth = has(5);
+  if (has(4)) intervals.push([4, "3M"]);
+  else if (has(3)) { quality = "m"; intervals.push([3, "3m"]); }
+  else if (has(5)) { sus = "sus4"; spareFourth = false; intervals.push([5, "4P"]); }
+  else if (has(2)) { sus = "sus2"; spareSecond = false; intervals.push([2, "2M"]); }
+  else omit += "(no3)";
+  if (has(7)) {
+    if (has(6) || has(8)) return null;
+    intervals.push([7, "5P"]);
+  } else if (has(6)) { fifth = "b5"; intervals.push([6, "5d"]); }
+  else if (has(8)) { fifth = "#5"; intervals.push([8, "5A"]); }
+  else omit += "(no5)";
+  if (has(9)) {
+    if (has(10) || has(11)) return null;
+    top = "6";
+    intervals.push([9, "6M"]);
+  } else if (has(10)) { top = "7"; intervals.push([10, "7m"]); }
+  else if (has(11)) { top = "maj7"; intervals.push([11, "7M"]); }
+  if (spareSecond) {
+    if (sus) return null;
+    intervals.push([2, "9M"]);
+    if (top === "7") top = "9"; else if (top === "maj7") top = "maj9"; else if (top === "6") top = "69"; else add = "add9";
+  }
+  if (spareFourth) {
+    if (top || add) return null;
+    add = "add4";
+    intervals.push([5, "4P"]);
+  }
+  if (sus && fifth) return null;
+  // Without a third or a suspension only a fifth with a sixth or seventh on top still reads as a chord.
+  if (omit.includes("no3") && !(has(7) && top)) return null;
+  const head = quality && top.startsWith("maj") ? `mMaj${top.slice(3)}` : quality + top;
+  return { suffix: head + sus + fifth + add + omit, intervals };
+}
+
+/** The reading on a chosen root for notes the chord library cannot name there, e.g. A D F# on A: A6sus4(no5). */
+function rootedChord(pcs: number[], rootPc: number, bassPc: number, spelling: Spelling): LensChord | null {
+  if (pcs.length < 3) return null;
+  const shape = rareShape(new Set(pcs.filter((pc) => pc !== rootPc).map((pc) => (pc - rootPc + 12) % 12)));
+  if (!shape) return null;
+  const rootName = spellPitchClass(rootPc, spelling);
+  const tones = shape.intervals.map(([semitones, interval]) => {
+    const pc = (rootPc + semitones) % 12;
+    const spelled = spelling === "auto" ? Note.transpose(rootName, interval) : "";
+    return { pc, interval, name: spelled && !/##|bb/.test(spelled) ? spelled : spellPitchClass(pc, spelling) };
+  });
+  const bass = bassPc === rootPc ? null : tones.find((tone) => tone.pc === bassPc)?.name ?? null;
+  return {
+    symbol: rootName + shape.suffix + (bass ? `/${bass}` : ""),
+    rootName,
+    rootPc,
+    suffix: shape.suffix,
+    type: "",
+    aliases: [],
+    notes: [rootName, ...tones.map((tone) => tone.name)],
+    intervals: ["1P", ...tones.map((tone) => tone.interval)],
+    pcs: [rootPc, ...tones.map((tone) => tone.pc)],
+    bassName: bass ?? rootName,
+    bassPc,
+    slash: Boolean(bass),
+    rare: true,
+  };
+}
+
+/**
+ * `rootPc` is the root the user asked for (the first key pressed, or a tone moved to the front). The notes are
+ * then read on that root, by rule if the library has no chord there; without it the best-scoring name wins.
+ */
+export function analyze(midis: number[], override: string | null, spelling: Spelling, rootPc: number | null = null): Analysis {
   const notes = unique(midis).sort((a, b) => a - b);
   const pcs = unique(notes.map((midi) => midi % 12));
   const result: Analysis = { notes, status: "empty", chord: null, candidates: [], tones: [], info: new Map(), bassPc: notes.length ? notes[0] % 12 : null };
@@ -272,7 +360,11 @@ export function analyze(midis: number[], override: string | null, spelling: Spel
       if (!candidates.some((candidate) => candidate.symbol === typed.symbol)) candidates.unshift(typed);
     }
   }
-  if (!chosen && pcs.length > 1) chosen = candidates[0] ?? null;
+  if (!chosen && pcs.length > 1) {
+    chosen = rootPc !== null && pcs.includes(rootPc)
+      ? candidates.find((candidate) => candidate.rootPc === rootPc) ?? rootedChord(pcs, rootPc, pcs[0], spelling)
+      : candidates[0] ?? null;
+  }
   result.candidates = candidates.map((candidate) => respell(candidate, spelling));
 
   if (chosen) {
@@ -286,16 +378,28 @@ export function analyze(midis: number[], override: string | null, spelling: Spel
     result.tones = tones.map((tone) => ({ ...tone, ...intervalInfo(tone.ivl), isBass: tone.pc === chord.bassPc, isRoot: tone.pc === chord.rootPc }));
   } else {
     result.status = pcs.length === 1 ? "single" : pcs.length === 2 ? "interval" : "unknown";
-    const bassName = spellPitchClass(pcs[0], spelling);
-    result.tones = pcs.map((pc) => {
+    // Measured from the root the user chose, or from the lowest note when they chose none.
+    const base = rootPc !== null && pcs.includes(rootPc) ? rootPc : pcs[0];
+    const above = (pc: number) => (pc - base + 12) % 12;
+    result.tones = [...pcs].sort((a, b) => above(a) - above(b)).map((pc) => {
       const name = spellPitchClass(pc, spelling);
-      const ivl = pc === pcs[0] ? "1P" : Interval.distance(bassName, name);
+      const ivl = SIMPLE_INTERVALS[above(pc)];
       const info = intervalInfo(ivl);
-      return { pc, name, ivl, ...info, slot: result.status === "unknown" ? "n" : info.slot, isBass: pc === pcs[0], isRoot: pc === pcs[0] };
+      return { pc, name, ivl, ...info, slot: result.status === "unknown" ? "n" : info.slot, isBass: pc === pcs[0], isRoot: pc === base };
     });
   }
   result.tones.forEach((tone) => result.info.set(tone.pc, tone));
   return result;
+}
+
+/** The same pitch classes with one of them as root and lowest note, voiced the way a typed chord is. */
+export function keysOverRoot(midis: number[], rootPc: number): number[] {
+  const pcs = unique(midis.map((midi) => midi % 12));
+  if (!pcs.includes(rootPc)) return midis;
+  const above = pcs.filter((pc) => pc !== rootPc).sort((a, b) => ((a - rootPc + 12) % 12) - ((b - rootPc + 12) % 12));
+  const close = keysFromPitchClasses(rootPc, above);
+  const chord = analyze(close, null, "auto", rootPc).chord;
+  return chord && !chord.rare ? keysForChord(chord) : close;
 }
 
 /** Autocomplete for the search field. Text without a root applies the quality to `currentRoot`. */

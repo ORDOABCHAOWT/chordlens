@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { analyze, keysForChord, parseChordSymbol } from "../src/music/analysis";
-import { explainChord } from "../src/music/explain";
+import { explainChord, inversionName } from "../src/music/explain";
 
 function explain(symbol: string) {
   const chord = parseChordSymbol(symbol)!;
@@ -30,6 +30,16 @@ describe("chord explanations", () => {
     expect(explain("C/G").inversion).toContain("C/G → G7 → C");
     expect(explain("C7/Bb").inversion).toContain("第三转位");
     expect(explain("C/D").inversion).toContain("不属于和弦本身");
+  });
+
+  it("names the inversion for the line beside the chord name", () => {
+    const name = (symbol: string) => {
+      const chord = parseChordSymbol(symbol)!;
+      const view = analyze(keysForChord(chord), chord.symbol, "auto");
+      return inversionName(view.chord!, view.tones);
+    };
+    expect(["C/E", "C/G", "C7/Bb", "Cm7b5/Gb"].map(name)).toEqual(["第一转位", "第二转位", "第三转位", "第二转位"]);
+    expect(["C", "C/D", "C6/A"].map(name)).toEqual(["", "", ""]);
   });
 
   it("falls back to a generated description for rarer chord types", () => {
